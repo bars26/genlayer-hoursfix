@@ -59,7 +59,22 @@ the business page validators would check. Funding a call or submitting a fix nee
 mappers) over real OpenStreetMap edits made in Central and East London in November 2026. Every transaction, ruling,
 page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.md).
 
-<!-- DEMO-RESULTS -->
+| Fix | Place (real OSM edit) | When the call opened → after the edit | The business's page | Ruling |
+|---|---|---|---|---|
+| `fix_0` | The Signal Box, Euston (node/6381240591 v10, 16 Nov) | none → `Mo-Sa 08:00-22:00; Su 09:00-21:00` | Monday–Saturday 08:00–22:00, Sunday 09:00–21:00 | **ELIGIBLE**, confirmed a day later |
+| `fix_1` | PizzaExpress, Baker Street (node/299523381 v26) | none → `Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00` | the same week, day by day | **ELIGIBLE**, confirmed |
+| `fix_2` | Wavelengths Leisure Centre, Deptford (way/1579773881 v2) | none → `Mo-Fr 06:30-22:00, Sa-Su 08:00-18:00` | Mon - Fri 06:30 - 22:00, Sat - Sun 08:00 - 18:00 | **ELIGIBLE**, held for its survival period |
+| `fix_3` | Dr Alter, Tottenham Court Road (node/14362459727 v2) | matches the page (Sunday closed) | Mo-Fr 09:00-19:00; Sa 10:00-17:00; Su closed | INELIGIBLE: same mapper as `fix_2`, cap of one |
+| `fix_4` | Pizza Pilgrims, Victoria (node/5215406428 v11) | the version did not change the week | — | INELIGIBLE: no change |
+| `fix_5` | Superdrug, Cheapside (way/517030126 v6) | none → a full week | the site refused GenLayer's readers | UNCLEAR: nothing reserved, can be resubmitted |
+| `fix_6` | Petit Pret, Marylebone (node/1251964294 v22) | — | — | INELIGIBLE: outside the call's box |
+
+- **Confirmed** (`fix_0`, `fix_1`): a fresh reading a day after the edits showed the same weeks. Each paid 0.05 GEN to the
+  scout who submitted it; each mapper's 0.45 GEN is held until they publish a GenLayer wallet on their OSM profile (a
+  claim for The Signal Box's mapper was refused: *"CyrlNish's OpenStreetMap profile does not publish one GenLayer wallet yet"*).
+- **Refused, taking nothing:** a call box larger than one degree, the same element submitted twice more, closing the
+  call before its last day, and a withdrawal with nothing credited.
+- `totals()` matched the contract's on-chain balance at **four points**, the last after the scout's withdrawal.
 
 ## Who can do what (and the attacks this blocks)
 
