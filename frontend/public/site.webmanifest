@@ -1,0 +1,10 @@
+{
+  "name": "HoursFix",
+  "short_name": "HoursFix",
+  "description": "Rewards for OpenStreetMap opening-hours fixes, checked by GenLayer validators against the business's own page",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#F5F3EE",
+  "theme_color": "#F5F3EE",
+  "icons": [{ "src": "/favicon.svg", "sizes": "any", "type": "image/svg+xml" }]
+}
