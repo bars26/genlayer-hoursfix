@@ -12,7 +12,7 @@ and pages are real (OpenStreetMap data © OpenStreetMap contributors, ODbL).
 `call_0` "Central & East London opening hours": box south 51.47, west -0.16, north 51.54, east -0.02; places with
 shop, amenity, leisure; fixes made since 2026-10-20, submitted by 2026-12-31; 0.5 GEN per fix
 (90% mapper, 10% scout); at most 1 paid fix per mapper; an edit must stand 1 day.
-Now: pot 2.5 GEN, reserved 0.5 GEN, paid 0.1 GEN, 3 eligible of 7 submitted.
+Now: pot 2 GEN, reserved 0.5 GEN, paid 0.15 GEN, 4 eligible of 8 submitted.
 
 ## Every fix
 
@@ -38,6 +38,16 @@ HoursFix reads (`check_hours`).
 - **fix_6** (Petit Pret, Marylebone (outside the call's box)): INELIGIBLE: The element is outside the call's area. node/1251964294 v22 (Petit Pret) by BaguetteYeeter on 2026-11-16: '(none)' -> 'Mo-Fr 05:30-21:30; Sa 06:30-20:00; Su 07:00-20:00'. Reading at 2026-11-17T21:11:04 UTC, packet sha256 `3f32ef92f05b2d3881ff3a5f62c2f5e93d2b1f46f2896113688fccc0b4c74d47`.
 
 Check an edit yourself: `curl -s https://api.openstreetmap.org/api/0.6/node/6381240591/history.json`.
+
+## Wallet test from the live app
+
+MetaMask test from the production app (hoursfix-bars26.vercel.app) on GenLayer Studio. The tester looks up Pitfield, a café in Hoxton, in the no-wallet checker (node/4895959823: hours added in version 11 on 16 November by the mapper okwithmydecay), submits that edit to the demo call as a scout, confirms it after its one-day survival period and withdraws the scout's 10%. Submitting and confirming send no GEN. Wallet `0x4f80b5c475fced34fc9a07ffccf39e1adc1406bf`.
+
+| Step | GEN sent | Result | Tx |
+|---|---|---|---|
+| Submit node/4895959823 v11 (Pitfield) to call_0 |  | fix_7 ELIGIBLE: OSM had no hours when the call's window opened; the edit set 07:30-16:00 (every day); Pitfield's own page says "Monday — Sunday 7:30 — 16:00"; 0.5 GEN reserved | [0x47c5af6b…](https://explorer-studio.genlayer.com/tx/0x47c5af6b29342647f968d06af068efa7586e8b8653b07d9b0ce260fbf7037328) |
+| Confirm fix_7 |  | awaiting_wallet: the latest version is still v11 with the same week; 0.05 GEN credited to the tester as scout, the mapper's 0.45 GEN held until okwithmydecay publishes a GenLayer wallet on their OSM profile | [0xe6cd0f01…](https://explorer-studio.genlayer.com/tx/0xe6cd0f01c43bfd7a81373b68011ea4632b5a8d4013365f8a453fdec601c21c28) |
+| Withdraw |  | 0.05 GEN sent to the tester; totals() expected balance 3.85 GEN equals the contract balance | [0xd07e25b0…](https://explorer-studio.genlayer.com/tx/0xd07e25b0aea1c24746ebe131ec8563a4cd116623f47e1a60a8834a03886c31e5) |
 
 ## Every transaction
 
@@ -77,4 +87,4 @@ not withdrawn); their sum must equal the contract's GEN balance on chain.
 | eligible fixes reserved from the pot | 1.5 GEN | 2.5 GEN | 0 GEN | 0 GEN | 4 GEN | 4 GEN | match |
 | two fixes confirmed: scouts paid, mapper shares held | 0.5 GEN | 2.5 GEN | 0.9 GEN | 0.1 GEN | 4 GEN | 4 GEN | match |
 | end of run, after the withdrawal | 0.5 GEN | 2.5 GEN | 0.9 GEN | 0 GEN | 3.9 GEN | 3.9 GEN | match |
-| now (when this file was generated) | 0.5 GEN | 2.5 GEN | 0.9 GEN | 0 GEN | 3.9 GEN | 3.9 GEN | match |
+| now (when this file was generated) | 0.5 GEN | 2 GEN | 1.35 GEN | 0 GEN | 3.85 GEN | 3.85 GEN | match |

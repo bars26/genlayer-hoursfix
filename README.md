@@ -75,6 +75,9 @@ page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.m
 - **Refused, taking nothing:** a call box larger than one degree, the same element submitted twice more, closing the
   call before its last day, and a withdrawal with nothing credited.
 - `totals()` matched the contract's on-chain balance at **four points**, the last after the scout's withdrawal.
+- **A MetaMask test from the live app:** the tester found Pitfield (a Hoxton café whose hours were added on 16 November)
+  in the checker, submitted that edit as a scout (`fix_7`, ELIGIBLE: the page says "Monday — Sunday 7:30 — 16:00"),
+  confirmed it and withdrew the scout's 0.05 GEN. Its transactions are in `docs/ui-test.json` and in REPRODUCTION.
 
 ## Who can do what (and the attacks this blocks)
 
