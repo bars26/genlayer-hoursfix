@@ -39,10 +39,11 @@ export async function GET(request: Request) {
     }
     const edits: ElementPreview["edits"] = [];
     for (let i = 0; i < versions.length; i++) {
+      const site = (t: any) => String(t?.["opening_hours:url"] ?? t?.website ?? t?.["contact:website"] ?? "");
       const before = String(versions[i - 1]?.tags?.opening_hours ?? "");
       const after = String(versions[i]?.tags?.opening_hours ?? "");
       if (after && after !== before)
-        edits.push({ version: versions[i].version, at: String(versions[i].timestamp ?? "").slice(0, 19), user: String(versions[i].user ?? ""), uid: String(versions[i].uid ?? ""), changeset: String(versions[i].changeset ?? ""), before, after });
+        edits.push({ version: versions[i].version, at: String(versions[i].timestamp ?? "").slice(0, 19), user: String(versions[i].user ?? ""), uid: String(versions[i].uid ?? ""), changeset: String(versions[i].changeset ?? ""), before, after, siteBefore: site(versions[i - 1]?.tags), siteAfter: site(versions[i]?.tags) });
     }
     const preview: ElementPreview = {
       element: `${el.kind}/${el.id}`,

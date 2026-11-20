@@ -63,6 +63,8 @@ export interface Reading {
     old_at: string;
     previous: string;
     website: string;
+    edit_website?: string;
+    address?: string;
     lat?: number;
     lon?: number;
   };
@@ -80,7 +82,7 @@ export interface ElementPreview {
   latest: number;
   lat: number | null;
   lon: number | null;
-  edits: { version: number; at: string; user: string; uid: string; changeset: string; before: string; after: string }[];
+  edits: { version: number; at: string; user: string; uid: string; changeset: string; before: string; after: string; siteBefore: string; siteAfter: string }[];
 }
 
 export const MIN_REWARD_WEI = 10n ** 16n;
@@ -155,7 +157,9 @@ export const CODE_LABEL: Record<string, string> = {
   no_location: "no location",
   outside_area: "outside the call's area",
   new_unparsed: "new value outside the compared syntax",
-  no_website: "no website to check against",
+  no_prior_website: "no page named before the call's window (an edit cannot bring its own source)",
+  geometry_changed: "way's nodes changed after the edit",
+  way_too_large: "way too large to locate",
   site_unreadable: "business page could not be read",
   no_hours_on_site: "page states no weekly hours",
   does_not_match_site: "new hours differ from the page",

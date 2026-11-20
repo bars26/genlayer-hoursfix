@@ -21,14 +21,16 @@ HoursFix makes the check and the payment a contract:
    fix) submits it: the element and the version that set the hours.
 3. **Every validator** reads the element's full history from the OSM API and decides **in code**: the version was made
    in the window and inside the box, carries one of the call's keys, and actually changed the week the version before
-   it described. Then it reads the **business's own page** (the `website` or `opening_hours:url` tag; rendered in a
-   browser if a plain fetch is refused) and the model writes that page's regular weekly hours in `opening_hours`
-   syntax. All values become weeks of time ranges, compared in code: the new week must **equal the page's**, and the
+   it described (for a way, its location is where its nodes were at the edit). Then it reads the **business's own
+   page**: the `opening_hours:url` or `website` the place named **before the call's window opened**, so an edit that adds
+   or swaps the page cannot bring its own source (rendered in a browser if a plain fetch is refused). The model writes
+   that page's regular weekly hours in `opening_hours` syntax. All values become weeks of time ranges, compared in code: the new week must **equal the page's**, and the
    week the place had **when the call's window opened** must not (otherwise there was nothing to fix, and breaking
    hours after a call opens to "fix" them earns nothing).
 4. An eligible fix **reserves** the reward. After the survival period anyone **confirms** it: validators read the
-   element again. Same week: **90% to the mapper, 10% to whoever submitted it**. Changed or deleted: the reward goes
-   back to the pot.
+   element again, check that it still names the same page, and **read that page again**. Same week on both: **90% to
+   the mapper, 10% to whoever submitted it**. Hours changed, page changed, the page now states another week, or the
+   element deleted: the reward goes back to the pot, or straight to the sponsor if the call has closed.
 5. The mapper's 90% goes to the GenLayer wallet the mapper publishes on their **OSM profile** (a line such as
    `GenLayer wallet: 0x…`); until they do, it is **held** for them and anyone can send it once the line appears. After
    the call ends the unreserved pot returns to the sponsor; a share never claimed returns 90 days later. Every share is
@@ -39,7 +41,17 @@ example) to see, without a wallet, every edit that changed its opening hours, th
 the business page validators would check. Funding a call or submitting a fix needs MetaMask on GenLayer Studio (chain
 61999) and **Test GEN** from the header.
 
-**Contract (GenLayer Studio):** [`0xf3e17409dae4e00f94162eF8a2C8C449ba33284D`](https://explorer-studio.genlayer.com/address/0xf3e17409dae4e00f94162eF8a2C8C449ba33284D)
+**Contract (GenLayer Studio, v1.1):** [`0xc2B033fC1d4Ee51D9D85b3F80ece3aA534F2D885`](https://explorer-studio.genlayer.com/address/0xc2B033fC1d4Ee51D9D85b3F80ece3aA534F2D885).
+v1 ([`0xf3e1…284D`](https://explorer-studio.genlayer.com/address/0xf3e17409dae4e00f94162eF8a2C8C449ba33284D)) and its run are in [`docs/v1/`](docs/v1/).
+
+### What v1.1 changes (after review)
+
+| Review point | v1 | v1.1 |
+|---|---|---|
+| A rewarded edit could supply its own authority | the page read was the one the **edit** named, so an edit could point `website` at a page its author wrote | the page read is the one the place named **before the call's window opened**; a place with none is `no_prior_website`, never paid. In the live run, Pitfield's edit swapped the café's website and set hours matching the new one; v1 paid it, v1.1 reads the earlier page |
+| Confirmation did not recheck that authority | confirmation re-read only the element's hours | confirmation also checks the element still names the same page and **reads the page again**; the week must still match. An unreadable page decides nothing (the fix stays held) |
+| Ways were located by today's geometry | `way/full.json` (current nodes) | the **submitted version's** node list; those nodes are used only if none changed after the edit (so today's positions are the positions at the edit), otherwise `geometry_changed`; more than 200 nodes is `way_too_large` |
+| A reward reverted after the call closed stayed in the closed pot | credited to `pot`, which a closed call never returns | credited straight to the sponsor (`returned_total`); tested in `test_a_reverted_fix_after_the_call_closed_returns_to_the_sponsor` |
 
 ## Why GenLayer
 
@@ -55,29 +67,29 @@ the business page validators would check. Funding a call or submitting a fix nee
 
 ## Verified live, on real London edits
 
-`scripts/demo.mjs` ran HoursFix on GenLayer Studio with a demo call (a test wallet, test GEN; not an offer to these
+`scripts/demo.mjs` ran HoursFix v1.1 on GenLayer Studio with a demo call (a test wallet, test GEN; not an offer to these
 mappers) over real OpenStreetMap edits made in Central and East London in November 2026. Every transaction, ruling,
-page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.md).
+page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.md); the v1 run is in [`docs/v1/`](docs/v1/).
 
-| Fix | Place (real OSM edit) | When the call opened → after the edit | The business's page | Ruling |
-|---|---|---|---|---|
-| `fix_0` | The Signal Box, Euston (node/6381240591 v10, 16 Nov) | none → `Mo-Sa 08:00-22:00; Su 09:00-21:00` | Monday–Saturday 08:00–22:00, Sunday 09:00–21:00 | **ELIGIBLE**, confirmed a day later |
-| `fix_1` | PizzaExpress, Baker Street (node/299523381 v26) | none → `Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00` | the same week, day by day | **ELIGIBLE**, confirmed |
-| `fix_2` | Wavelengths Leisure Centre, Deptford (way/1579773881 v2) | none → `Mo-Fr 06:30-22:00, Sa-Su 08:00-18:00` | Mon - Fri 06:30 - 22:00, Sat - Sun 08:00 - 18:00 | **ELIGIBLE**, held for its survival period |
-| `fix_3` | Dr Alter, Tottenham Court Road (node/14362459727 v2) | matches the page (Sunday closed) | Mo-Fr 09:00-19:00; Sa 10:00-17:00; Su closed | INELIGIBLE: same mapper as `fix_2`, cap of one |
-| `fix_4` | Pizza Pilgrims, Victoria (node/5215406428 v11) | the version did not change the week | — | INELIGIBLE: no change |
-| `fix_5` | Superdrug, Cheapside (way/517030126 v6) | none → a full week | the site refused GenLayer's readers | UNCLEAR: nothing reserved, can be resubmitted |
-| `fix_6` | Petit Pret, Marylebone (node/1251964294 v22) | — | — | INELIGIBLE: outside the call's box |
+| Fix | Place (real OSM edit) | Page read (named before the window) | Ruling |
+|---|---|---|---|
+| `fix_0` | The Signal Box, Euston (node/6381240591 v10): none → `Mo-Sa 08:00-22:00; Su 09:00-21:00` | signalboxeuston.co.uk, named since July: the same week | **ELIGIBLE**; confirmed a day later after the element and the page were read again |
+| `fix_1` | PizzaExpress, Baker Street (node/299523381 v26): none → `Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00` | pizzaexpress.com/london-baker-street, named since August: the same week | **ELIGIBLE**; confirmed |
+| `fix_2` | Pitfield, Hoxton (node/4895959823 v11): none → `07:30-16:00`, **and the edit swapped the website** | friendsofourscafe.com (the earlier page), not the new pitfieldsocial.co.uk | UNCLEAR: the earlier page states no weekly hours. v1 paid this fix from the page the edit brought |
+| `fix_3` | Wavelengths Leisure Centre (way/1579773881 v2), created inside the window | none | INELIGIBLE: no page before the window (way located from its 30 unchanged nodes) |
+| `fix_4` | Superdrug, Cheapside (way/517030126 v6): hours **and website** added by the same edit | none | INELIGIBLE: no page before the window |
+| `fix_5` | Pizza Pilgrims, Victoria (node/5215406428 v11) | — | INELIGIBLE: the version did not change the week |
+| `fix_6` | Petit Pret, Marylebone (node/1251964294 v22) | — | INELIGIBLE: outside the call's box |
 
-- **Confirmed** (`fix_0`, `fix_1`): a fresh reading a day after the edits showed the same weeks. Each paid 0.05 GEN to the
-  scout who submitted it; each mapper's 0.45 GEN is held until they publish a GenLayer wallet on their OSM profile (a
-  claim for The Signal Box's mapper was refused: *"CyrlNish's OpenStreetMap profile does not publish one GenLayer wallet yet"*).
-- **Refused, taking nothing:** a call box larger than one degree, the same element submitted twice more, closing the
-  call before its last day, and a withdrawal with nothing credited.
+- **Confirmed** (`fix_0`, `fix_1`): a day after the edits, validators read each element and its page again; both
+  still showed the same week. Each paid 0.05 GEN to the scout; each mapper's 0.45 GEN is held until they publish a
+  GenLayer wallet on their OSM profile (a claim for The Signal Box's mapper was refused: *"CyrlNish's OpenStreetMap
+  profile does not publish one GenLayer wallet yet"*).
+- **Refused, taking nothing:** a call box larger than one degree, the same element submitted again, closing the call
+  before its last day, and a withdrawal with nothing credited.
 - `totals()` matched the contract's on-chain balance at **four points**, the last after the scout's withdrawal.
-- **A MetaMask test from the live app:** the tester found Pitfield (a Hoxton café whose hours were added on 16 November)
-  in the checker, submitted that edit as a scout (`fix_7`, ELIGIBLE: the page says "Monday — Sunday 7:30 — 16:00"),
-  confirmed it and withdrew the scout's 0.05 GEN. Its transactions are in `docs/ui-test.json` and in REPRODUCTION.
+- The path where a fix is reverted after its call closed (the reward goes straight to the sponsor) is covered by
+  `test_a_reverted_fix_after_the_call_closed_returns_to_the_sponsor`; it needs a call to end, which a same-day live run cannot show.
 
 ## Who can do what (and the attacks this blocks)
 
@@ -86,9 +98,12 @@ page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.m
 | Only versions made in the call's window, inside its box, on places with its keys count | The sponsor pays for the area and the kinds of places it chose |
 | The version must change the week the previous version described | Re-saving or reformatting someone else's fix earns nothing |
 | The hours as they stood when the window opened must not already match the page | Nobody can break hours after a call opens and then "fix" them |
+| The page compared is the one the place named before the window opened | An edit cannot bring, or point to, its own source |
+| A way is located where its nodes were at the edit; if a node changed since, it is not eligible | The box is checked against the place as edited, not as moved later |
 | The new week must equal the page's, compared in code | The model reads the page; it never decides the outcome |
 | One eligible fix per element per call; a cap per mapper | No double payouts; no single mapper drains a call |
-| The reward is reserved, then paid only if a fresh reading after the survival period shows the same week | Fixes reverted as wrong, or vandalism, are not paid |
+| The reward is reserved, then paid only if, after the survival period, the element shows the same week, names the same page, and that page still states that week | Fixes reverted as wrong, vandalism, or a source that changed are not paid |
+| A reward reverted after the call closed goes straight to the sponsor | A closed call never strands GEN |
 | The mapper is paid only at the wallet on their own OSM profile; two different addresses count as none | Nobody can redirect a mapper's reward |
 | Sites that cannot be read, or state no weekly hours, are `UNCLEAR`: nothing reserved, and the fix can be submitted again | An unreadable source never decides a payout |
 | Pots come from a deposit; every share is credited; only `withdraw` sends GEN | No GEN rides on a reading, and no payout can fail halfway |
@@ -99,7 +114,7 @@ page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.m
 ```bash
 python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 genvm-lint check contracts/hours_fix.py
-python -m pytest tests/direct -q                         # 67 direct-mode tests
+python -m pytest tests/direct -q                         # 77 direct-mode tests
 npm install
 node scripts/deploy.mjs                                  # deploys to GenLayer Studio, prints the address
 node scripts/demo.mjs <address>                          # the live demo; writes docs/demo-run.json
@@ -110,6 +125,9 @@ cd frontend && npm run dev                               # the app on localhost:
 
 ## Limits
 
+- A place that had no web page on OSM before a call opened cannot be paid in that call, even if the edit that adds the
+  page is honest; and a business that legitimately moves to a new site will be checked against the old one until a
+  call opens after the change.
 - Some business sites refuse automated readers (Superdrug and Specsavers did, from GenLayer Studio's validators,
   even rendered); their fixes are `UNCLEAR` and cannot be paid until the page can be read.
 - Only the regular week is compared: public holidays, seasonal hours, month or date rules are outside the parser, and

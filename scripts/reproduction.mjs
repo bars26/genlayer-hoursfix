@@ -42,7 +42,7 @@ const rows = Object.values(fixes).map((f) => {
 const details = Object.values(fixes).map((f) => {
   const r = JSON.parse(f.reading_json || "{}");
   const conf = f.confirm_json ? JSON.parse(f.confirm_json) : null;
-  return `- **${f.id}** (${esc(run.labels[f.id] || f.element)}): ${esc(f.why)} Reading at ${r.read_at} UTC, packet sha256 \`${r.packet_sha256}\`${r.site?.text_sha256 ? `, page text sha256 \`${r.site.text_sha256}\` (${r.site.chars} characters read from ${esc(r.facts?.website)})` : ""}.${conf ? ` Confirmed at ${conf.read_at} UTC: latest version v${conf.version}, hours ${conf.same ? "unchanged" : "changed"} (\`${esc(conf.current)}\`); mapper wallet ${conf.wallet || "not published"}; scout ${gen(f.scout_share)}, mapper ${gen(f.mapper_share)}.` : ""}`;
+  return `- **${f.id}** (${esc(run.labels[f.id] || f.element)}): ${esc(f.why)} Reading at ${r.read_at} UTC, packet sha256 \`${r.packet_sha256}\`${r.site?.text_sha256 ? `, page text sha256 \`${r.site.text_sha256}\` (${r.site.chars} characters read from ${esc(r.facts?.website)})` : ""}.${r.facts?.edit_website && r.facts.edit_website !== r.facts.website ? ` The edit switched the place's page to ${esc(r.facts.edit_website)}; the page read was the one named before the window, ${esc(r.facts.website) || "(none)"}.` : ""}${conf ? ` Confirmed at ${conf.read_at} UTC: latest version v${conf.version}, hours ${conf.hours_same ? "unchanged" : "changed"} (\`${esc(conf.current)}\`), page ${conf.authority_same ? "unchanged" : `changed to ${esc(conf.authority_now)}`}${conf.site_week ? `, page read again: ${esc(conf.site_week)}` : ""}; mapper wallet ${conf.wallet || "not published"}; scout ${gen(f.scout_share)}, mapper ${gen(f.mapper_share)}.` : ""}`;
 });
 const log = run.log.map((r) => `| ${r.who} | \`${esc(r.call)}\` | ${r.value === "0" ? "" : r.value} | ${r.status} | ${r.exec} | ${esc(r.refused ? `refused: ${r.refused}` : r.returned ?? "").slice(0, 160)} | ${tx(r.hash)} |`);
 const recon = [
@@ -67,7 +67,7 @@ ${ui.steps.map(([step, value, result, hash]) => `| ${esc(step)} | ${value} | ${e
 }
 
 const box = JSON.parse(call.box_json);
-const md = `# HoursFix: reproduction
+const md = `# HoursFix v1.1: reproduction
 
 Every ruling below was made by GenLayer validators on GenLayer Studio, reading OpenStreetMap's public API and the
 businesses' own web pages. Contract \`${run.contract}\` ([explorer](${EXPLORER}/address/${run.contract})); \`node scripts/verify-code.mjs ${run.contract}\`
@@ -85,8 +85,9 @@ Now: pot ${gen(call.pot)}, reserved ${gen(call.reserved)}, paid ${gen(call.paid_
 
 ## Every fix
 
-"When the call opened" is the element's hours on the last version before ${call.since}; every value is shown as the week
-HoursFix reads (\`check_hours\`).
+"When the call opened" is the element's hours on the last version before ${call.since}, and the page read is the one the
+element named on that version; every value is shown as the week HoursFix reads (\`check_hours\`). v1's run is in
+[\`docs/v1/\`](v1/).
 
 | Fix | Place, edit | When the call opened | After the edit | The business's page | Ruling | State |
 |---|---|---|---|---|---|---|

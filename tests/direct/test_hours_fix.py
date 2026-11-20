@@ -200,23 +200,43 @@ def test_an_eligible_fix_reserves_the_reward(direct_vm, direct_deploy, direct_al
     assert (int(t["pots"]), int(t["reserved"])) == (POT - REWARD, REWARD)
 
 
-def test_a_way_is_located_by_its_nodes(direct_vm, direct_deploy, direct_alice, direct_bob):
-    contract, call_id = _open(direct_vm, direct_deploy, direct_alice)
-    way = [dict(v, type="way", id=77) for v in DEFAULT]
+def _way(direct_vm, nodes, node_rows):
+    """A way (id 77) whose version 2 is the fix; `node_rows` is what OSM returns for its nodes today."""
+    way = [dict(v, type="way", id=77, nodes=nodes) for v in DEFAULT]
     for v in way:
         v.pop("lat"), v.pop("lon")
     direct_vm.clear_mocks()
     _history(direct_vm, way, kind="way", eid=77)
-    _get(direct_vm, f"{OSM}/way/77/full.json", {"elements": [
-        {"type": "node", "id": 1, "lat": 51.514, "lon": -0.095}, {"type": "node", "id": 2, "lat": 51.516, "lon": -0.093},
-        {"type": "way", "id": 77, "nodes": [1, 2]}]})
+    ids = ",".join(sorted(set(str(n) for n in nodes)))
+    _get(direct_vm, f"{OSM}/nodes.json?nodes={ids}", {"elements": node_rows})
     _page(direct_vm)
     _user(direct_vm)
     _llm(direct_vm)
+
+
+def test_a_way_is_located_where_its_nodes_were_at_the_edit(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract, call_id = _open(direct_vm, direct_deploy, direct_alice)
+    _way(direct_vm, [1, 2, 1], [{"type": "node", "id": 1, "lat": 51.514, "lon": -0.095, "timestamp": _ts(-300)},
+                                {"type": "node", "id": 2, "lat": 51.516, "lon": -0.093, "timestamp": _ts(-300)}])
     direct_vm.sender = direct_bob
     fix_id = contract.submit(call_id, "way", "77", 2)
     f = json.loads(contract.get_fix(fix_id).reading_json)["facts"]
     assert (contract.get_fix(fix_id).verdict, f["lat"], f["lon"]) == ("ELIGIBLE", 51.515, -0.094)
+
+
+@pytest.mark.parametrize("nodes, rows, code", [
+    # a node moved (or was edited) after the edit: where the way was at the edit cannot be shown
+    ([1, 2], [{"type": "node", "id": 1, "lat": 51.514, "lon": -0.095, "timestamp": _ts(-300)},
+              {"type": "node", "id": 2, "lat": 48.85, "lon": 2.35, "timestamp": _ts(-1)}], "geometry_changed"),
+    ([1, 2], [{"type": "node", "id": 1, "lat": 51.514, "lon": -0.095, "timestamp": _ts(-300)}], "geometry_changed"),
+    (list(range(1, 202)), [], "way_too_large"),
+])
+def test_ways_whose_location_at_the_edit_cannot_be_shown_are_not_eligible(direct_vm, direct_deploy, direct_alice, direct_bob, nodes, rows, code):
+    contract, call_id = _open(direct_vm, direct_deploy, direct_alice)
+    _way(direct_vm, nodes, rows)
+    direct_vm.sender = direct_bob
+    fix_id = contract.submit(call_id, "way", "77", 2)
+    assert (contract.get_fix(fix_id).verdict, contract.get_fix(fix_id).code) == ("INELIGIBLE", code)
 
 
 @pytest.mark.parametrize("setup, verdict, code", [
@@ -228,7 +248,8 @@ def test_a_way_is_located_by_its_nodes(direct_vm, direct_deploy, direct_alice, d
     (dict(versions=[_version(1, _ts(-200)), _version(2, _ts(-3), oh="Mon-Fri 9-5")]), "INELIGIBLE", "new_unparsed"),
     (dict(oh="Mo-Fr 08:00-20:00; Sa 09:00-18:00; Su 12:00-18:00"), "INELIGIBLE", "does_not_match_site"),
     (dict(versions=[_version(1, _ts(-200), oh=SITE_HOURS), _version(2, _ts(-5), oh="Mo-Fr 01:00-02:00"), _version(3, _ts(-3), oh=SITE_HOURS)], version=3), "INELIGIBLE", "already_correct"),
-    (dict(versions=[_version(1, _ts(-200)), _version(2, _ts(-3), oh=SITE_HOURS, tags={"website": None})]), "UNCLEAR", "no_website"),
+    (dict(versions=[_version(1, _ts(-200), tags={"website": None}), _version(2, _ts(-3), oh=SITE_HOURS)]), "INELIGIBLE", "no_prior_website"),
+    (dict(versions=[_version(2, _ts(-3), oh=SITE_HOURS)]), "INELIGIBLE", "no_prior_website"),  # created inside the window
     (dict(page_status=403, page=""), "UNCLEAR", "site_unreadable"),
     (dict(found=False, oh=""), "UNCLEAR", "no_hours_on_site"),
     (dict(oh="Mon to Fri 7.30am to 8pm"), "UNCLEAR", "no_hours_on_site"),
@@ -250,6 +271,18 @@ def test_a_fix_made_in_two_edits_is_compared_with_the_hours_before_the_call(dire
     r = json.loads(contract.get_fix(fix_id).reading_json)
     assert contract.get_fix(fix_id).verdict == "ELIGIBLE"
     assert (r["facts"]["old"], r["facts"]["previous"]) == ("Mo-Sa 09:00-17:00", "Mo-Fr 07:30-20:00")
+
+
+def test_the_source_is_the_page_named_before_the_window_not_one_the_edit_brings(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract, call_id = _open(direct_vm, direct_deploy, direct_alice)
+    evil = "https://hours-i-wrote.example/superdrug"
+    versions = [_version(1, _ts(-200)), _version(2, _ts(-3), oh=SITE_HOURS, tags={"website": evil, "opening_hours:url": evil})]
+    _setup(direct_vm, versions=versions)
+    _page(direct_vm, url=evil, page="<p>Monday to Sunday 07:30 - 20:00 (we promise)</p>")
+    direct_vm.sender = direct_bob
+    fix_id = contract.submit(call_id, "node", "1001", 2)
+    f = json.loads(contract.get_fix(fix_id).reading_json)["facts"]
+    assert (f["website"], f["edit_website"]) == (SITE, evil)  # the page read is the one named before the window
 
 
 def test_a_page_that_refuses_a_plain_fetch_is_rendered(direct_vm, direct_deploy, direct_alice, direct_bob):
@@ -388,6 +421,59 @@ def test_a_changed_or_deleted_fix_returns_the_reward_to_the_pot(direct_vm, direc
     with direct_vm.expect_revert("not waiting for confirmation"):
         contract.confirm(fix_id)
     _balance(contract)
+
+
+@pytest.mark.parametrize("setup, why", [
+    (dict(oh="Mo-Fr 09:00-17:00"), "the page now states another week"),
+    (dict(versions=DEFAULT + [_version(3, _ts(-1), oh=SITE_HOURS, tags={"website": "https://elsewhere.example/"})]), "the element names another page"),
+])
+def test_confirm_rechecks_the_source(direct_vm, direct_deploy, direct_alice, direct_bob, setup, why):
+    contract, call_id, fix_id = _eligible(direct_vm, direct_deploy, direct_alice, direct_bob)
+    _ripen(contract, fix_id)
+    _setup(direct_vm, **setup)
+    assert contract.confirm(fix_id) == "reverted", why
+    r = json.loads(contract.get_fix(fix_id).confirm_json)
+    assert r["same"] is False and r["authority"] == SITE
+    assert int(contract.get_call(call_id).pot) == POT and _owed(contract, direct_bob) == 0
+
+
+def test_an_unreadable_source_at_confirmation_changes_nothing(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract, call_id, fix_id = _eligible(direct_vm, direct_deploy, direct_alice, direct_bob)
+    _ripen(contract, fix_id)
+    _setup(direct_vm, page="", page_status=503)
+    with direct_vm.expect_revert("page could not be read right now"):
+        contract.confirm(fix_id)
+    _setup(direct_vm, found=False, oh="")
+    with direct_vm.expect_revert("did not show its weekly hours"):
+        contract.confirm(fix_id)
+    assert contract.get_fix(fix_id).state == "held" and int(contract.get_call(call_id).reserved) == REWARD
+
+
+def test_validators_accept_a_confirmation_quoted_differently(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract, call_id, fix_id = _eligible(direct_vm, direct_deploy, direct_alice, direct_bob)
+    _ripen(contract, fix_id)
+    _setup(direct_vm)
+    contract.confirm(fix_id)
+    r = json.loads(contract.get_fix(fix_id).confirm_json)
+    r.pop("read_at")
+    assert direct_vm.run_validator(leader_result=json.dumps(dict(r, site_quote="Mon-Fri 7.30am-8pm …"), sort_keys=True))
+    assert not direct_vm.run_validator(leader_result=json.dumps(dict(r, same=False), sort_keys=True))
+    assert not direct_vm.run_validator(leader_result=json.dumps(dict(r, site_week="Mo-Su 07:30-20:00"), sort_keys=True))
+
+
+def test_a_reverted_fix_after_the_call_closed_returns_to_the_sponsor(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract, call_id, fix_id = _eligible(direct_vm, direct_deploy, direct_alice, direct_bob)
+    contract.calls[call_id].ends = _day(-1)
+    assert contract.close_call(call_id) == str(POT - REWARD)
+    _ripen(contract, fix_id)
+    _setup(direct_vm, versions=DEFAULT + [_version(3, _ts(-1), oh="Mo-Su 10:00-16:00")])
+    assert contract.confirm(fix_id) == "reverted"
+    c = contract.get_call(call_id)
+    assert (int(c.pot), int(c.reserved), int(c.returned_total)) == (0, 0, POT)
+    assert _owed(contract, direct_alice) == POT  # the closed call's pot and the reverted reward
+    t = _balance(contract)
+    assert (int(t["pots"]), int(t["reserved"]), int(t["owed"])) == (0, 0, POT)
+    assert "to" in c.history_json and '"sponsor"' in c.history_json
 
 
 def test_close_returns_the_unreserved_pot(direct_vm, direct_deploy, direct_alice, direct_bob):

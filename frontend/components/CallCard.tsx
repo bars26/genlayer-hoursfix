@@ -63,6 +63,12 @@ function FixRow({ fix: f }: { fix: Fix }) {
         </div>
       )}
       {r.site?.quote && <p className="text-xs text-muted-foreground">Page says: &ldquo;{r.site.quote}&rdquo;</p>}
+      {r.facts?.website && (
+        <p className="text-xs text-muted-foreground break-all">
+          Source (named before the window): {r.facts.website}
+          {r.facts.edit_website && r.facts.edit_website !== r.facts.website ? ` · the edit switched it to ${r.facts.edit_website}, which is not used` : ""}
+        </p>
+      )}
       <p className="text-xs">
         Mapper{" "}
         <a href={osmUserUrl(f.mapper)} target="_blank" rel="noopener noreferrer" className="underline">

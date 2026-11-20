@@ -50,19 +50,21 @@ await write(C.sponsor, "sponsor", "open_call", ["Too big", "51.0", "-1.0", "52.5
 await reconcile(C.sponsor, "the 4 GEN pot taken from the deposit");
 
 // Real edits, as they are on OpenStreetMap today.
-const signal = await submit("The Signal Box, Euston (hours added 16 Nov)", "node", "6381240591", 10);
-const pizza = await submit("PizzaExpress, Baker Street (hours added 15 Nov)", "node", "299523381", 26);
-await submit("Wavelengths Leisure Centre, Deptford (hours rewritten 16 Nov)", "way", "1579773881", 2);
-await submit("Dr Alter, Tottenham Court Road (same mapper, second fix)", "node", "14362459727", 2);
+const signal = await submit("The Signal Box, Euston (hours added 16 Nov; site named since July)", "node", "6381240591", 10);
+const pizza = await submit("PizzaExpress, Baker Street (hours added 15 Nov; site named since August)", "node", "299523381", 26);
+// The edit replaced the cafe's website with a new one and set hours matching the new site: the page validators read is
+// the one the place named before the window opened, not the one the edit brought.
+await submit("Pitfield, Hoxton (the edit also changed the website)", "node", "4895959823", 11);
+await submit("Wavelengths Leisure Centre, Deptford (way created inside the window)", "way", "1579773881", 2);
+await submit("Superdrug, Cheapside (website added by the same edit)", "way", "517030126", 6);
 await submit("Pizza Pilgrims, Victoria (an edit that did not change the week)", "node", "5215406428", 11);
-await submit("Superdrug, Cheapside (site refuses automated readers)", "way", "517030126", 6);
 await submit("Petit Pret, Marylebone (outside the call's box)", "node", "1251964294", 22);
-// Refused before a fix is stored: the same element again, and a version that does not exist.
+// Refused before a fix is stored: the same element again.
 await submit("The Signal Box again", "node", "6381240591", 10, { expectError: true });
-await submit("A version OpenStreetMap does not have", "node", "6381240591", 99, { expectError: true });
 await reconcile(C.sponsor, "eligible fixes reserved from the pot");
 
-// After the one-day survival period anyone confirms: validators read each element again.
+// After the one-day survival period anyone confirms: validators read each element again, check it still names the
+// same page, and read that page again.
 for (const fixId of [signal, pizza]) await write(C.keeper, "keeper", "confirm", [fixId]);
 // No mapper publishes a GenLayer wallet on their OSM profile yet: their 90% is held, and a claim is refused.
 await write(C.keeper, "keeper", "claim", [signal], 0n, { expectError: true });

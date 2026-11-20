@@ -155,12 +155,18 @@ export function EditCheck({ calls }: { calls: Call[] }) {
                   <p className="text-[#9B3B24]">HoursFix does not read this value (outside the compared syntax), so it would not be paid.</p>
                 )}
                 {same && <p className="text-[#9B3B24]">This version describes the same week as the one before it: not a change.</p>}
+                {e.siteAfter !== e.siteBefore && (
+                  <p className="text-[#9B3B24]">
+                    This edit also changed the place&apos;s web page ({e.siteBefore || "none"} → {e.siteAfter || "none"}). Validators read the page the place
+                    named before the call&apos;s window opened, never one an edit brings.
+                  </p>
+                )}
               </div>
             );
           })}
           <p className="text-xs text-muted-foreground">
-            Validators compare the new week with the business&apos;s own page and with the hours as they stood when the call&apos;s window opened. The
-            mapper earns 90% once the edit has stood the call&apos;s survival period; whoever submits it earns 10%.
+            Validators compare the new week with the page the place named before the call&apos;s window opened, and with the hours as they stood
+            then. Once the edit has stood the survival period they read the element and that page again; the mapper earns 90%, whoever submits it 10%.
           </p>
         </div>
       )}

@@ -74,6 +74,7 @@ _MAX_BOX_DEGREES = 1.0
 _MAX_SURVIVAL_DAYS = 60
 _HOLD_AFTER_DAYS = 90  # an unclaimed mapper share is held this long after the call ends
 _MAX_PAGE_CHARS = 6000
+_MAX_WAY_NODES = 200  # a way with more distinct nodes is not located (one request for its nodes)
 _HISTORY_LIMIT = 16
 _OSM = "https://api.openstreetmap.org/api/0.6"
 _HEADERS = {"accept": "application/json", "user-agent": "HoursFix/1.0 (GenLayer; github.com/bars26/genlayer-hoursfix)"}
@@ -251,19 +252,35 @@ def _history(kind: str, eid: str) -> tuple:
     return ("ok", elements) if elements else ("none", None)
 
 
-def _centre(kind: str, eid: str, version: dict) -> tuple:
-    """(lat, lon) of a node version, or the mean of a way's current node positions."""
+def _centre(kind: str, version: dict) -> tuple:
+    """Where the element was when the submitted version was made. A node version carries its own position. A way
+    version lists its nodes: their positions are read and used only if no node has changed since the edit (so the
+    current positions are the positions at the time); otherwise the way's location at the edit cannot be shown and it
+    is not eligible. ("ok", (lat, lon)) / ("unsupported" | "unverifiable" | "none" | "error", None)."""
     if kind == "node":
         if "lat" not in version or "lon" not in version:
             return "none", None
         return "ok", (float(version["lat"]), float(version["lon"]))
-    state, data = _get_json(f"{_OSM}/way/{eid}/full.json")
-    if state != "ok":
-        return state, None
-    nodes = [e for e in (data.get("elements") or []) if e.get("type") == "node" and "lat" in e]
-    if not nodes:
+    refs = [str(n) for n in (version.get("nodes") or []) if re.match(r"^\d{1,12}$", str(n))]
+    if not refs:
         return "none", None
-    return "ok", (sum(float(n["lat"]) for n in nodes) / len(nodes), sum(float(n["lon"]) for n in nodes) / len(nodes))
+    unique = sorted(set(refs))
+    if len(unique) > _MAX_WAY_NODES:
+        return "unsupported", None
+    state, data = _get_json(f"{_OSM}/nodes.json?nodes={','.join(unique)}")
+    if state == "error":
+        return "error", None
+    if state != "ok":
+        return "unverifiable", None
+    edited = str(version.get("timestamp") or "")[:19]
+    nodes = {str(n.get("id")): n for n in (data.get("elements") or []) if isinstance(n, dict)}
+    points = []
+    for ref in unique:
+        n = nodes.get(ref)
+        if not n or n.get("visible", True) is False or "lat" not in n or str(n.get("timestamp") or "")[:19] > edited:
+            return "unverifiable", None
+        points.append((float(n["lat"]), float(n["lon"])))
+    return "ok", (sum(p[0] for p in points) / len(points), sum(p[1] for p in points) / len(points))
 
 
 def _mapper(uid: str) -> tuple:
@@ -334,15 +351,21 @@ Respond only with that JSON, without any prefix or suffix.
             "quote": str(answer.get("quote") or "")[:200]}
 
 
+def _authority(tags: dict) -> str:
+    """The page an element names as the source of its hours."""
+    return str(tags.get("opening_hours:url") or tags.get("website") or tags.get("contact:website") or "").strip()[:300]
+
+
 def read_fix(kind: str, eid: str, version: int, since: str, now: str, box: list, keys: list) -> dict:
     """The whole reading of a submitted fix, run by the leader and again by every validator.
 
     In code: the version exists, was made on or after `since` (and not in the future), sets opening_hours and changes
     the week the version before it described; the element carries one of the call's keys and lies inside the call's
-    box. The hours are compared with the element's hours as they stood when the call's window opened (the last version
-    before `since`): if those already matched the page, there was nothing to fix, so nobody can break hours after a
-    call opens and then "fix" them. The model only reads the business's own web page and writes its weekly hours; the
-    comparison of the weeks (as of `since`, new, the page's) is made in code."""
+    box (for a way, where its nodes were at the edit). The hours are compared with the element's hours as they stood
+    when the call's window opened (the last version before `since`): if those already matched the page, there was
+    nothing to fix, so nobody can break hours after a call opens and then "fix" them. The page itself is the one the
+    element named before the window opened: an edit cannot bring, or point to, its own source. The model only reads
+    that page and writes its weekly hours; the comparison of the weeks (as of `since`, new, the page's) is made in code."""
     state, versions = _history(kind, eid)
     if state != "ok":
         return {"state": state, "what": "element"}
@@ -362,7 +385,8 @@ def read_fix(kind: str, eid: str, version: int, since: str, now: str, box: list,
         "name": str(tags.get("name") or "")[:120], "new": str(tags.get("opening_hours") or "")[:255],
         "old": str((base.get("tags") or {}).get("opening_hours") or "")[:255], "old_at": str(base.get("timestamp") or "")[:19],
         "previous": str(prev_tags.get("opening_hours") or "")[:255],
-        "website": str(tags.get("opening_hours:url") or tags.get("website") or tags.get("contact:website") or "")[:300],
+        "website": _authority(base.get("tags") or {}), "edit_website": _authority(tags),
+        "address": " ".join(str(tags.get(k) or "") for k in ("addr:housenumber", "addr:street", "addr:postcode", "addr:city")).strip()[:160],
     }
     out = {"state": "ok", "facts": facts}
 
@@ -376,9 +400,13 @@ def read_fix(kind: str, eid: str, version: int, since: str, now: str, box: list,
         return rule(INELIGIBLE, "no_hours")
     if keys and not any(k in tags for k in keys):
         return rule(INELIGIBLE, "wrong_kind")
-    cstate, centre = _centre(kind, eid, v)
+    cstate, centre = _centre(kind, v)
     if cstate == "error":
         return {"state": "error", "what": "geometry"}
+    if cstate == "unsupported":
+        return rule(INELIGIBLE, "way_too_large")
+    if cstate == "unverifiable":
+        return rule(INELIGIBLE, "geometry_changed")
     if cstate != "ok":
         return rule(INELIGIBLE, "no_location")
     facts["lat"], facts["lon"] = round(centre[0], 6), round(centre[1], 6)
@@ -390,12 +418,11 @@ def read_fix(kind: str, eid: str, version: int, since: str, now: str, box: list,
     if facts["previous"] and parse_hours(facts["previous"]) == new_week:
         return rule(INELIGIBLE, "no_change")
     if not re.match(r"^https?://\S+$", facts["website"]):
-        return rule(UNCLEAR, "no_website")
+        return rule(INELIGIBLE, "no_prior_website")
     text = _page_text(facts["website"])
     if len(text) < 60:
         return rule(UNCLEAR, "site_unreadable")
-    address = " ".join(str(tags.get(k) or "") for k in ("addr:housenumber", "addr:street", "addr:postcode", "addr:city")).strip()
-    site = _site_hours(facts["name"], address, facts["website"], text)
+    site = _site_hours(facts["name"], facts["address"], facts["website"], text)
     site_week = parse_hours(site["opening_hours"]) if site["found"] else None
     old_week = parse_hours(facts["old"])
     out["site"] = {"found": site["found"], "opening_hours": site["opening_hours"], "quote": site["quote"],
@@ -427,8 +454,8 @@ def _validator(read):
 def same_reading(a: dict, b: dict) -> bool:
     """Validators agree on the state, the ruling and everything it rests on; the model's wording may differ, the week
     it wrote may not."""
-    if "facts" not in a and "facts" not in b:  # a confirmation or a wallet reading: every field must agree
-        return a == b
+    if "facts" not in a and "facts" not in b:  # a confirmation or a wallet reading: every field but the quote must agree
+        return {k: v for k, v in a.items() if k != "site_quote"} == {k: v for k, v in b.items() if k != "site_quote"}
     keys = ("state", "what", "verdict", "code", "facts", "weeks")
     return all(a.get(k) == b.get(k) for k in keys) and (a.get("site") or {}).get("found") == (b.get("site") or {}).get("found")
 
@@ -442,7 +469,9 @@ CODE_TEXT = {
     "no_location": "The element has no location",
     "outside_area": "The element is outside the call's area",
     "new_unparsed": "The new opening_hours value is outside the syntax HoursFix compares",
-    "no_website": "The element has no website to check the hours against",
+    "no_prior_website": "The element named no web page before the call's window opened; an edit cannot bring its own source",
+    "geometry_changed": "The way's nodes changed after the edit, so where it was at the edit cannot be shown",
+    "way_too_large": "The way has more nodes than HoursFix locates",
     "site_unreadable": "The business's page could not be read",
     "no_hours_on_site": "The business's page does not state regular weekly hours",
     "does_not_match_site": "The new hours do not match the hours on the business's own page",
@@ -726,10 +755,11 @@ class HoursFix(_Contract):
 
     @gl.public.write
     def confirm(self, fix_id: str) -> str:
-        """Once an eligible fix has stood `survival_days`, anyone confirms it: validators read the element again. If its
-        hours still describe the same week, the reward is paid: 10% credited to the scout, 90% to the GenLayer wallet the
-        mapper publishes on their OSM profile (or held for the mapper until they do). If the hours changed or the
-        element is gone, the reward goes back to the call's pot."""
+        """Once an eligible fix has stood `survival_days`, anyone confirms it: validators read the element again, check it
+        still names the same page, and read that page again. If the element and the page still describe the same week,
+        the reward is paid: 10% credited to the scout, 90% to the GenLayer wallet the mapper publishes on their OSM profile
+        (or held for the mapper until they do). If the hours, the page or the page's week changed, or the element is gone,
+        the reward goes back to the call's pot, or to the sponsor if the call has closed."""
         fix = self._fix(fix_id)
         if fix.state != HELD:
             raise _Err("This fix is not waiting for confirmation")
@@ -737,37 +767,61 @@ class HoursFix(_Contract):
             raise _Err(f"The fix is confirmed from {fix.held_until.replace('T', ' ')} UTC")
         c = self.calls[fix.call_id]
         kind, eid = fix.element.split("/")
-        accepted = json.loads(fix.reading_json)["weeks"]["new"]
+        reading = json.loads(fix.reading_json)
+        accepted = reading["weeks"]["new"]
+        authority = reading["facts"]["website"]
+        name, address = reading["facts"].get("name", ""), reading["facts"].get("address", "")
         uid = fix.mapper_uid
 
         def current() -> str:
             state, versions = _history(kind, eid)
             if state == "error":
-                return json.dumps({"state": "error"})
+                return json.dumps({"state": "error", "what": "osm"})
             latest = max(versions, key=lambda v: int(v.get("version") or 0)) if versions else {}
             visible = bool(latest) and latest.get("visible", True) is not False
             now_hours = str((latest.get("tags") or {}).get("opening_hours") or "")
-            same = visible and hours_text(parse_hours(now_hours)) == accepted
+            out = {"state": "ok", "version": int(latest.get("version") or 0), "visible": visible, "current": now_hours[:255],
+                   "authority": authority, "authority_now": _authority(latest.get("tags") or {}) if visible else "",
+                   "hours_same": visible and hours_text(parse_hours(now_hours)) == accepted}
+            out["authority_same"] = out["authority_now"] == authority
+            out["site_week"] = ""
+            if out["hours_same"] and out["authority_same"]:
+                # the source is read again: the page the fix was checked against must still state the same week
+                text = _page_text(authority)
+                if len(text) < 60:
+                    return json.dumps({"state": "error", "what": "page"})
+                site = _site_hours(name, address, authority, text)
+                week = parse_hours(site["opening_hours"]) if site["found"] else None
+                if week is None:
+                    return json.dumps({"state": "error", "what": "page_hours"})
+                out["site_week"] = hours_text(week)
+                out["site_quote"] = site["quote"]
+            out["same"] = out["hours_same"] and out["authority_same"] and out["site_week"] == accepted
             mstate, m = _mapper(uid)
             if mstate == "error":
-                return json.dumps({"state": "error"})
-            return json.dumps({"state": "ok", "version": int(latest.get("version") or 0), "visible": visible,
-                               "current": now_hours[:255], "same": same, "wallet": (m or {}).get("wallet", ""),
-                               "mapper_name": (m or {}).get("name", "")}, sort_keys=True)
+                return json.dumps({"state": "error", "what": "osm"})
+            out["wallet"] = (m or {}).get("wallet", "")
+            out["mapper_name"] = (m or {}).get("name", "")
+            return json.dumps(out, sort_keys=True)
 
         r = json.loads(gl.vm.run_nondet(current, _validator(current)))
         if r["state"] != "ok":
-            raise _Err("OpenStreetMap could not be read right now; try again")
+            what = {"page": "The business's page could not be read right now", "page_hours": "The business's page did not show its weekly hours to the validators"}
+            raise _Err(f"{what.get(r.get('what'), 'OpenStreetMap could not be read right now')}; try again")
         r["read_at"] = self._now()[:19]
         fix.confirm_json = json.dumps(r, sort_keys=True)
         reward = int(fix.reward)
         c.reserved = _plus(c.reserved, -reward)
         self.reserved_total = _plus(self.reserved_total, -reward)
         if not r["same"]:
-            c.pot = _plus(c.pot, reward)
-            self.pots_total = _plus(self.pots_total, reward)
+            if c.state == "open":
+                c.pot = _plus(c.pot, reward)
+                self.pots_total = _plus(self.pots_total, reward)
+            else:  # a closed call has returned its pot already: the reward goes straight back to the sponsor
+                self._credit(c.sponsor, reward)
+                c.returned_total = _plus(c.returned_total, reward)
             fix.state = REVERTED
-            self._log(c, "reverted", fix=fix.id)
+            self._log(c, "reverted", fix=fix.id, to="pot" if c.state == "open" else "sponsor")
             return REVERTED
         scout_share = reward * _SCOUT_PERCENT // 100
         mapper_share = reward - scout_share

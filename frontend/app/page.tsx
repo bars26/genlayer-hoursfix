@@ -105,19 +105,21 @@ export default function HomePage() {
                 <p>
                   <strong>The edit, from OpenStreetMap.</strong> Validators read the element&apos;s full history: who made the version, when, what
                   opening_hours it set, and what the place had when the call&apos;s window opened. The version must change the week, be made in the
-                  window, and lie inside the call&apos;s box.
+                  window, and lie inside the call&apos;s box (for a way, where its nodes were at the edit).
                 </p>
                 <p>
-                  <strong>The source, from the business.</strong> They fetch the place&apos;s own web page (rendered in a browser if needed) and write
-                  its regular weekly hours in opening_hours syntax.
+                  <strong>The source, from before the call.</strong> They fetch the web page the place named on OSM before the call&apos;s window
+                  opened (rendered in a browser if needed) and write its regular weekly hours in opening_hours syntax. An edit that adds or swaps
+                  the page cannot supply its own source.
                 </p>
                 <p>
                   <strong>The comparison, in code.</strong> All three values become a week of time ranges. The new week must equal the page&apos;s,
                   and the week before the call must not. Breaking hours after a call opens and &ldquo;fixing&rdquo; them earns nothing.
                 </p>
                 <p>
-                  <strong>It must stand.</strong> The reward is reserved, then paid only if a fresh reading after the survival period still shows the
-                  same week. Reverted or vandalised fixes return to the pot.
+                  <strong>It must stand.</strong> The reward is reserved, then paid only if, after the survival period, the element still shows the
+                  same week, still names the same page, and that page still states that week. Otherwise the reward returns to the pot (to the
+                  sponsor if the call has closed).
                 </p>
                 <p>
                   <strong>Pull payments.</strong> The mapper&apos;s 90% goes to the GenLayer wallet on their OSM profile (a line like
