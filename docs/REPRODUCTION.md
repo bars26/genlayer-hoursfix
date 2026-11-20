@@ -40,6 +40,18 @@ element named on that version; every value is shown as the week HoursFix reads (
 
 Check an edit yourself: `curl -s https://api.openstreetmap.org/api/0.6/node/6381240591/history.json`.
 
+## Wallet test from the live app
+
+MetaMask test of v1.1 from the production app (hoursfix-bars26.vercel.app) on GenLayer Studio, following the steps given to reviewers: the tester funds their own call with the Central London preset (fixes made since 2026-10-21, 0.5 GEN per fix, 2 GEN pot, 1-day survival), submits The Signal Box's hours edit (node/6381240591 v10) to it, confirms it and withdraws the scout's 10%. Submitting and confirming send no GEN. Wallet `0x4f80b5c475fced34fc9a07ffccf39e1adc1406bf`.
+
+| Step | GEN sent | Result | Tx |
+|---|---|---|---|
+| Deposit 2 GEN (sent by the app before opening the call) | 2 GEN | credited to the tester | [0x1fb8979b…](https://explorer-studio.genlayer.com/tx/0x1fb8979b0518d38fcb7be25ca3df8f9353e358ef6227f2a79b7d0cc33c22972c) |
+| Open call_1: Central London, box 51.49,-0.16 to 51.53,-0.07, since 2026-10-21, 0.5 GEN per fix, 2 GEN pot from the deposit |  | call_1 open | [0xbf88b508…](https://explorer-studio.genlayer.com/tx/0xbf88b5086268d017df8cb6f3155d22bc74b1cf04032aff932597b51efd4bc3e5) |
+| Submit node/6381240591 v10 (The Signal Box) to call_1 |  | fix_7 ELIGIBLE: the source is signalboxeuston.co.uk, the page the element named before the window (since July); OSM had no hours on 21 October; the edit set Mo-Sa 08:00-22:00; Su 09:00-21:00, the same week as the page; 0.5 GEN reserved | [0x9c7aac89…](https://explorer-studio.genlayer.com/tx/0x9c7aac8930b3b2089813f919c0cfe2db923f70c7982e2353caf3d360ded756b1) |
+| Confirm fix_7 |  | awaiting_wallet: the element still shows the same week and names the same page, and the page read again states Mo-Sa 08:00-22:00; Su 09:00-21:00; 0.05 GEN credited to the tester as scout, the mapper's 0.45 GEN held for a wallet on their OSM profile | [0xbfd850d4…](https://explorer-studio.genlayer.com/tx/0xbfd850d4fdc13a8756c0ea8c9447d50f42bee708c58e3a6b65bc9222b6f1f785) |
+| Withdraw |  | 0.05 GEN sent to the tester; totals() expected balance 5.85 GEN equals the contract balance | [0x29833619…](https://explorer-studio.genlayer.com/tx/0x298336197935e9319c8e8c7c887cefa24f08bd81929fabef5fcaf021b75d5bef) |
+
 ## Every transaction
 
 A refused call is still ACCEPTED by consensus; the contract outcome is the `exec` column (`ERROR` = refused, on purpose here).
@@ -77,4 +89,4 @@ not withdrawn); their sum must equal the contract's GEN balance on chain.
 | eligible fixes reserved from the pot | 1 GEN | 3 GEN | 0 GEN | 0 GEN | 4 GEN | 4 GEN | match |
 | two fixes confirmed: scouts paid, mapper shares held | 0 GEN | 3 GEN | 0.9 GEN | 0.1 GEN | 4 GEN | 4 GEN | match |
 | end of run, after the withdrawal | 0 GEN | 3 GEN | 0.9 GEN | 0 GEN | 3.9 GEN | 3.9 GEN | match |
-| now (when this file was generated) | 0 GEN | 3 GEN | 0.9 GEN | 0 GEN | 3.9 GEN | 3.9 GEN | match |
+| now (when this file was generated) | 0 GEN | 4.5 GEN | 1.35 GEN | 0 GEN | 5.85 GEN | 5.85 GEN | match |

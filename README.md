@@ -88,6 +88,9 @@ page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.m
 - **Refused, taking nothing:** a call box larger than one degree, the same element submitted again, closing the call
   before its last day, and a withdrawal with nothing credited.
 - `totals()` matched the contract's on-chain balance at **four points**, the last after the scout's withdrawal.
+- **A MetaMask test of v1.1 from the live app**, the same steps reviewers are given: the tester funded their own Central
+  London call, submitted The Signal Box's edit (`fix_7`, ELIGIBLE against the page named since July), confirmed it (the
+  page read again showed the same week) and withdrew the scout's 0.05 GEN. In `docs/ui-test.json` and REPRODUCTION.
 - The path where a fix is reverted after its call closed (the reward goes straight to the sponsor) is covered by
   `test_a_reverted_fix_after_the_call_closed_returns_to_the_sponsor`; it needs a call to end, which a same-day live run cannot show.
 
