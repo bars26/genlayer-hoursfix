@@ -15,8 +15,8 @@ import { useRegistry } from "@/lib/hooks/useHoursFix";
 const STEPS = [
   { icon: MapPin, title: "Fund an area", body: "A sponsor (a city, a map app, a business association) funds a call: a box on the map, the kinds of places, a reward per fix." },
   { icon: CalendarClock, title: "A mapper fixes hours", body: "Someone corrects a shop's opening_hours on OpenStreetMap. Anyone submits that edit: the element and its version." },
-  { icon: Globe, title: "Validators check the source", body: "They read the edit's history and the business's own web page, write the page's hours as a week, and compare the weeks in code." },
-  { icon: Wallet, title: "Paid once it stands", body: "After the survival period the edit is read again. Unchanged: 90% to the mapper's wallet on their OSM profile, 10% to whoever submitted it." },
+  { icon: Globe, title: "Validators check the source", body: "They read the edit's history and the business's own web page, read the page's text and its schema.org hours, and compare the weeks in code." },
+  { icon: Wallet, title: "Paid once it stands", body: "Anyone may dispute a held fix with a stake. After the survival period it is read again; unchanged: 90% to the mapper's wallet, 10% to the scout." },
 ];
 
 export default function HomePage() {
@@ -109,8 +109,9 @@ export default function HomePage() {
                 </p>
                 <p>
                   <strong>The source, from before the call.</strong> They fetch the web page the place named on OSM before the call&apos;s window
-                  opened (rendered in a browser if needed) and write its regular weekly hours in opening_hours syntax. An edit that adds or swaps
-                  the page cannot supply its own source.
+                  opened (rendered in a browser if needed) and read it twice: the model writes the visible text&apos;s regular week in
+                  opening_hours syntax, and code parses the page&apos;s schema.org opening hours. If both exist they must agree; a page that
+                  contradicts itself decides nothing. An edit that adds or swaps the page cannot supply its own source.
                 </p>
                 <p>
                   <strong>The comparison, in code.</strong> All three values become a week of time ranges. The new week must equal the page&apos;s,
@@ -120,6 +121,11 @@ export default function HomePage() {
                   <strong>It must stand.</strong> The reward is reserved, then paid only if, after the survival period, the element still shows the
                   same week, still names the same page, and that page still states that week. Otherwise the reward returns to the pot (to the
                   sponsor if the call has closed).
+                </p>
+                <p>
+                  <strong>Anyone can dispute.</strong> Before confirmation, anyone who thinks a held fix no longer stands stakes a tenth of its
+                  reward. Validators read the element and the page again at once. Upheld: the stake back plus 10% of the reward, the rest returns.
+                  Dismissed: the stake joins the mapper&apos;s reward.
                 </p>
                 <p>
                   <strong>Pull payments.</strong> The mapper&apos;s 90% goes to the GenLayer wallet on their OSM profile (a line like

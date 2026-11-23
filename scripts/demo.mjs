@@ -41,42 +41,42 @@ const submit = async (label, kind, id, version, opts) => {
   return fixId;
 };
 
-// A sponsor funds a call for Central and East London: shops, cafés, restaurants, pubs and leisure centres; fixes made
-// since 20 October; 0.5 GEN per fix; at most one paid fix per mapper; an edit must stand one day.
+// A sponsor funds a call for Central and East London (to the Greenwich meridian): shops, cafés, restaurants, pubs and
+// leisure centres; fixes made since 20 October; 0.5 GEN per fix; at most one paid fix per mapper; an edit must stand one day.
 await write(C.sponsor, "sponsor", "deposit", [], 4n * GEN);
-await write(C.sponsor, "sponsor", "open_call", ["Central & East London opening hours", "51.47", "-0.16", "51.54", "-0.02", "shop,amenity,leisure", "2026-10-20", "2026-12-31", GEN / 2n, 1, 1, 4n * GEN]);
-// Refused before any reading: a box larger than one degree.
+await write(C.sponsor, "sponsor", "open_call", ["Central & East London opening hours (v2)", "51.47", "-0.16", "51.54", "0.0", "shop,amenity,leisure", "2026-10-20", "2026-12-31", GEN / 2n, 1, 1, 4n * GEN]);
 await write(C.sponsor, "sponsor", "open_call", ["Too big", "51.0", "-1.0", "52.5", "0.5", "shop", "2026-10-20", "2026-12-31", GEN / 2n, 1, 1, GEN], 0n, { expectError: true });
 await reconcile(C.sponsor, "the 4 GEN pot taken from the deposit");
 
-// Real edits, as they are on OpenStreetMap today.
-const signal = await submit("The Signal Box, Euston (hours added 16 Nov; site named since July)", "node", "6381240591", 10);
-const pizza = await submit("PizzaExpress, Baker Street (hours added 15 Nov; site named since August)", "node", "299523381", 26);
-// The edit replaced the cafe's website with a new one and set hours matching the new site: the page validators read is
-// the one the place named before the window opened, not the one the edit brought.
-await submit("Pitfield, Hoxton (the edit also changed the website)", "node", "4895959823", 11);
-await submit("Wavelengths Leisure Centre, Deptford (way created inside the window)", "way", "1579773881", 2);
-await submit("Superdrug, Cheapside (website added by the same edit)", "way", "517030126", 6);
-await submit("Pizza Pilgrims, Victoria (an edit that did not change the week)", "node", "5215406428", 11);
-await submit("Petit Pret, Marylebone (outside the call's box)", "node", "1251964294", 22);
-// Refused before a fix is stored: the same element again.
-await submit("The Signal Box again", "node", "6381240591", 10, { expectError: true });
+// v2 reads the page twice: its visible text (the model writes the week) and its schema.org opening hours (parsed in code).
+// Both present and the same week: eligible. Both present and different: sources_disagree, nothing reserved.
+const pizza = await submit("PizzaExpress, Baker Street: page text and schema.org state the same week", "node", "299523381", 26);
+await submit("The Signal Box, Euston: page text and schema.org state different weeks", "node", "6381240591", 10);
+const oma = await submit("Oma, Borough: hours added 14 Nov; page with visible hours only", "node", "12477919501", 4);
+await submit("Waitrose, Canary Wharf: Friday fixed 6 Nov; store page", "node", "1708718478", 23);
+await submit("Gantry Climbing, Rotherhithe: hours and website added by the same edit", "node", "11042163878", 6);
+await submit("PizzaExpress again", "node", "299523381", 26, { expectError: true });
 await reconcile(C.sponsor, "eligible fixes reserved from the pot");
 
-// After the one-day survival period anyone confirms: validators read each element again, check it still names the
-// same page, and read that page again.
-for (const fixId of [signal, pizza]) await write(C.keeper, "keeper", "confirm", [fixId]);
-// No mapper publishes a GenLayer wallet on their OSM profile yet: their 90% is held, and a claim is refused.
-await write(C.keeper, "keeper", "claim", [signal], 0n, { expectError: true });
-// The call runs until 31 December: closing it now is refused.
+// v2: anyone may dispute a held fix before it is confirmed, staking 10% of its reward. Validators read the element
+// and both page sources again at once. Here the fix still stands: the dispute is dismissed and the stake joins the
+// mapper's reward. A second dispute of the same fix is refused.
+await write(C.keeper, "keeper", "deposit", [], GEN / 10n);
+await write(C.keeper, "keeper", "dispute", [pizza]);
+await write(C.keeper, "keeper", "dispute", [pizza], 0n, { expectError: true });
+await reconcile(C.sponsor, "a dismissed dispute: the stake reserved for the mapper");
+
+for (const fixId of [pizza, oma]) await write(C.keeper, "keeper", "confirm", [fixId]);
+await write(C.keeper, "keeper", "dispute", [pizza], 0n, { expectError: true }); // confirmed: no longer disputable
+await write(C.keeper, "keeper", "claim", [pizza], 0n, { expectError: true }); // no wallet on the mapper's profile
 await write(C.keeper, "keeper", "close_call", [callId], 0n, { expectError: true });
-await reconcile(C.sponsor, "two fixes confirmed: scouts paid, mapper shares held");
+await reconcile(C.sponsor, "fixes confirmed: scouts credited, mapper shares (with the stake) held");
 await write(C.scout, "scout", "withdraw", []);
-await write(C.keeper, "keeper", "withdraw", [], 0n, { expectError: true }); // nothing credited to the keeper
+await write(C.keeper, "keeper", "withdraw", []); // the unstaked half of the deposit; the stake went to the mapper
 await reconcile(C.sponsor, "end of run, after the withdrawal");
 
 const plain = (m) => JSON.parse(JSON.stringify(m instanceof Map ? Object.fromEntries(m) : m, (k, v) => (typeof v === "bigint" ? v.toString() : v)));
-const out = { network: "studio", contract: CONTRACT, accounts: Object.fromEntries(Object.entries(acct).map(([k, a]) => [k, a.address])),
+const out = { network: "studio", version: "v2", contract: CONTRACT, accounts: Object.fromEntries(Object.entries(acct).map(([k, a]) => [k, a.address])),
   call: plain(await read(C.sponsor, "get_call", [callId])), fixes: {}, labels: fixes, reconciliations, log };
 for (const id of Object.keys(fixes)) out.fixes[id] = plain(await read(C.sponsor, "get_fix", [id]));
 writeFileSync(new URL("../docs/demo-run.json", import.meta.url), JSON.stringify(out, null, 2));

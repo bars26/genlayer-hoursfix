@@ -11,7 +11,11 @@ import {
   keysOf,
   osmHistoryUrl,
   osmUserUrl,
+  parseJson,
   readingOf,
+  STAKE_DIVISOR,
+  wei,
+  type DisputeReading,
   todayUtc,
   type Call,
   type Fix,
@@ -32,6 +36,8 @@ function FixRow({ fix: f }: { fix: Fix }) {
   const v = VERDICT_STYLE[f.verdict] ?? VERDICT_STYLE.UNCLEAR;
   const ripe = f.state === "held" && new Date(now).toISOString().slice(0, 19) >= f.held_until;
   const busy = (k: string) => pending === `${k}:${f.id}`;
+  const d = f.dispute_json ? parseJson<Partial<DisputeReading>>(f.dispute_json, {}) : null;
+  const bonus = wei(f.bonus);
   return (
     <li className="rounded-xl border border-border p-3 space-y-2 text-sm">
       <div className="flex flex-wrap items-center gap-2 text-xs">
@@ -62,6 +68,13 @@ function FixRow({ fix: f }: { fix: Fix }) {
           </div>
         </div>
       )}
+      {r.weeks && (r.weeks.visible || r.weeks.structured) && (
+        <p className="text-xs text-muted-foreground">
+          Two readings of the page: its visible text <span className="mono">{r.weeks.visible || "(none)"}</span> · its schema.org data{" "}
+          <span className="mono">{r.weeks.structured || "(none)"}</span>
+          {r.weeks.visible && r.weeks.structured ? (r.weeks.visible === r.weeks.structured ? " · they agree" : " · they disagree, so nothing is decided") : ""}
+        </p>
+      )}
       {r.site?.quote && <p className="text-xs text-muted-foreground">Page says: &ldquo;{r.site.quote}&rdquo;</p>}
       {r.facts?.website && (
         <p className="text-xs text-muted-foreground break-all">
@@ -77,16 +90,30 @@ function FixRow({ fix: f }: { fix: Fix }) {
         {f.mapper_wallet ? ` (wallet ${short(f.mapper_wallet)})` : ""} · edited {f.edited_at.replace("T", " ")} UTC · submitted by{" "}
         <span className="mono">{short(f.scout)}</span>
         {Number(f.reward) > 0 ? ` · reward ${formatGen(f.reward, 3)} GEN` : ""}
+        {bonus > 0n ? ` + ${formatGen(bonus, 3)} GEN from a dismissed dispute` : ""}
       </p>
       <p className="text-xs text-muted-foreground">
         {STATE_TEXT[f.state]}
         {f.state === "held" ? ` (from ${f.held_until.replace("T", " ")} UTC)` : ""}.
       </p>
+      {d && (
+        <p className="text-xs rounded-lg bg-muted/60 p-2">
+          Disputed by <span className="mono">{short(f.disputed_by || "")}</span>
+          {d.read_at ? ` at ${d.read_at.replace("T", " ")} UTC` : ""}: {d.same ? "dismissed" : "upheld"}. Hours now{" "}
+          <span className="mono">{d.current || "(none)"}</span> ({d.hours_same ? "same" : "changed"}), page {d.authority_same ? "same" : `changed to ${d.authority_now || "(none)"}`}
+          {d.site_week ? `, page read again: ${d.site_week}` : ""}.
+        </p>
+      )}
       {isConnected && (
         <div className="flex flex-wrap gap-2">
           {ripe && (
             <Button size="sm" onClick={() => write({ kind: "confirm", fixId: f.id })} disabled={!!pending}>
               {busy("confirm") && <Loader2 className="w-4 h-4 animate-spin" />} Confirm (validators read it again)
+            </Button>
+          )}
+          {f.state === "held" && !f.disputed_by && (
+            <Button size="sm" variant="outline" onClick={() => write({ kind: "dispute", fixId: f.id })} disabled={!!pending}>
+              {busy("dispute") && <Loader2 className="w-4 h-4 animate-spin" />} Dispute (stake {formatGen(wei(f.reward) / STAKE_DIVISOR, 3)} GEN)
             </Button>
           )}
           {f.state === "awaiting_wallet" && (

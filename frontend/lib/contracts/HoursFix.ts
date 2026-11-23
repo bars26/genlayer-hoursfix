@@ -61,15 +61,16 @@ const WRITE_EFFECT: Record<string, string> = {
   open_call: "no call was opened (the deposit stays credited)",
   submit: "no fix was recorded (validators may have failed to read OpenStreetMap or the business's page, or to agree)",
   confirm: "nothing was confirmed",
+  dispute: "the dispute was not recorded and no stake was taken",
   claim: "nothing was sent to the mapper",
   close_call: "the call was not closed",
   reclaim: "nothing was returned",
   withdraw: "nothing was sent",
 };
-const READS = new Set(["submit", "confirm", "claim"]);
+const READS = new Set(["submit", "confirm", "dispute", "claim"]);
 
 // Bradbury: time each validator phase may take (seconds, 30 to 600) and the fee prepaid for a withdraw's transfer.
-const BRADBURY_TIME = { submit: 400n, confirm: 200n, claim: 120n } as Record<string, bigint>;
+const BRADBURY_TIME = { submit: 400n, confirm: 300n, dispute: 300n, claim: 120n } as Record<string, bigint>;
 const WITHDRAW_GAS = 100_000n;
 const WITHDRAW_GAS_PRICE = 2_000_000_000n;
 
@@ -152,6 +153,8 @@ class HoursFix {
   submit = (callId: string, kind: string, id: string, version: number, onProgress?: (p: TxProgress) => void) =>
     this.write("submit", [callId, kind, id, BigInt(version)], 0n, onProgress);
   confirm = (id: string, onProgress?: (p: TxProgress) => void) => this.write("confirm", [id], 0n, onProgress);
+  /** Stakes a tenth of the fix's reward from the caller's credit (deposit it first). */
+  dispute = (id: string, onProgress?: (p: TxProgress) => void) => this.write("dispute", [id], 0n, onProgress);
   claim = (id: string, onProgress?: (p: TxProgress) => void) => this.write("claim", [id], 0n, onProgress);
   closeCall = (id: string, onProgress?: (p: TxProgress) => void) => this.write("close_call", [id], 0n, onProgress);
   reclaim = (id: string, onProgress?: (p: TxProgress) => void) => this.write("reclaim", [id], 0n, onProgress);
@@ -277,7 +280,7 @@ class HoursFix {
       throw classifyError(err, "send");
     }
     const reading = READS.has(functionName)
-      ? "Five Bradbury validators are reading OpenStreetMap (1 to 5 minutes)."
+      ? "Five Bradbury validators are reading OpenStreetMap and the business's page (1 to 5 minutes)."
       : "Waiting for Bradbury validators to decide (about a minute).";
     onProgress?.({ step: "submitted", txHash, message: `Transaction sent. ${reading}` });
 

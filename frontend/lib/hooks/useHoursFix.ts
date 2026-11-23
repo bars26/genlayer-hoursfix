@@ -3,7 +3,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import HoursFix, { type OpenCallInput, type TxProgress, type TxResult } from "../contracts/HoursFix";
-import { formatGen, nowIso, todayUtc, wei, type Call, type Fix } from "../contracts/types";
+import { STAKE_DIVISOR, formatGen, nowIso, parseJson, sameAddress, todayUtc, wei, type Call, type DisputeReading, type Fix } from "../contracts/types";
 import { isOnGenLayerNetwork, switchToGenLayerNetwork } from "../genlayer/client";
 import { useWallet } from "../genlayer/wallet";
 import { currentNetwork } from "../network";
@@ -82,6 +82,7 @@ export type WriteVars =
   | { kind: "open"; input: OpenCallInput }
   | { kind: "submit"; callId: string; type: string; id: string; version: number }
   | { kind: "confirm"; fixId: string }
+  | { kind: "dispute"; fixId: string }
   | { kind: "claim"; fixId: string }
   | { kind: "close"; callId: string }
   | { kind: "reclaim"; fixId: string }
@@ -91,6 +92,7 @@ export const WRITE_LABEL: Record<TxKind, string> = {
   open: "Open a call",
   submit: "Submit a fix",
   confirm: "Confirm the fix",
+  dispute: "Dispute the fix",
   claim: "Send to the mapper",
   close: "Close the call",
   reclaim: "Return to the sponsor",
@@ -141,6 +143,11 @@ export function useHoursWrite() {
             }
             result = await contract.openCall(vars.input, onProgress);
             callId = typeof result.returned === "string" ? result.returned : undefined;
+            if (!callId) {
+              // Bradbury reports no return value: the newest call this wallet sponsors is the one just opened.
+              const mine = (await contract.getCalls(0, 500)).filter((c) => sameAddress(c.sponsor, address) && c.title === vars.input.title);
+              callId = mine.at(-1)?.id;
+            }
             note = callId ? `${callId} is open: fixes made since ${vars.input.since} can be submitted until ${vars.input.ends}.` : "Call opened.";
             break;
           }
@@ -150,6 +157,13 @@ export function useHoursWrite() {
             if (wei(c.pot) < wei(c.reward)) refuse("This call's pot is fully reserved.");
             result = await contract.submit(vars.callId, vars.type, vars.id, vars.version, onProgress);
             fixId = typeof result.returned === "string" ? result.returned : undefined;
+            if (!fixId) {
+              const element = `${vars.type}/${vars.id}`;
+              const mine = (await contract.getFixes(0, 1000)).filter(
+                (f) => f.call_id === vars.callId && f.element === element && Number(f.version) === vars.version && sameAddress(f.scout, address)
+              );
+              fixId = mine.at(-1)?.id;
+            }
             if (fixId) {
               const f = await contract.getFix(fixId);
               note = `${fixId}: ${f.why}`;
@@ -162,12 +176,35 @@ export function useHoursWrite() {
             if (f.state !== "held") refuse("This fix is not waiting for confirmation.");
             if (nowIso() < f.held_until) refuse(`The fix is confirmed from ${f.held_until.replace("T", " ")} UTC.`);
             result = await contract.confirm(vars.fixId, onProgress);
+            const state = result.returned ?? (await contract.getFix(vars.fixId)).state;
             note =
-              result.returned === "paid"
+              state === "paid"
                 ? "Confirmed: 90% credited to the mapper's wallet, 10% to whoever submitted it."
-                : result.returned === "awaiting_wallet"
+                : state === "awaiting_wallet"
                   ? "Confirmed: the scout's 10% is credited; the mapper's 90% is held until a GenLayer wallet appears on their OSM profile."
                   : "The hours changed again before confirmation: the reward went back to the call.";
+            break;
+          }
+          case "dispute": {
+            const f = await contract.getFix(vars.fixId);
+            callId = f.call_id;
+            if (f.state !== "held") refuse("Only a fix waiting for confirmation can be disputed.");
+            if (f.disputed_by) refuse("This fix has been disputed already.");
+            const stake = wei(f.reward) / STAKE_DIVISOR;
+            const owed = await contract.owedTo(address);
+            if (owed < stake) {
+              onProgress({ step: "awaiting_wallet", message: `First, deposit the ${formatGen(stake, 4)} GEN stake: approve it in your wallet.` });
+              await contract.deposit(stake - owed, onProgress);
+            }
+            result = await contract.dispute(vars.fixId, onProgress);
+            const after = await contract.getFix(vars.fixId);
+            const d = parseJson<Partial<DisputeReading>>(after.dispute_json, {});
+            note =
+              after.state === "disputed"
+                ? `Upheld: ${d.hours_same === false ? "the hours changed" : d.authority_same === false ? "the page changed" : "the page no longer states that week"}. Your stake and 10% of the reward are credited to you.`
+                : after.disputed_by
+                  ? "Dismissed: the element and the page still show the same week. Your stake joins the mapper's reward."
+                  : "The validators could not read the page right now; nothing was staked.";
             break;
           }
           case "claim": {
