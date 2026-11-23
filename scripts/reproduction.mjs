@@ -38,7 +38,7 @@ const rows = Object.values(fixes).map((f) => {
   const r = JSON.parse(f.reading_json || "{}");
   const w = r.weeks || {};
   const both = w.visible !== undefined ? `<br>text: \`${esc(w.visible) || "none"}\`<br>schema.org: \`${esc(w.structured) || "none"}\`` : "";
-  const site = r.site ? `${esc(w.site) || (r.site.found ? "" : "no weekly hours found")}${both}${r.site.quote ? `<br>*"${esc(r.site.quote).slice(0, 140)}"*` : ""}` : "—";
+  const site = r.site ? `${esc(w.site) || (w.visible && w.structured && w.visible !== w.structured ? "**the two readings differ**" : r.site.found ? "" : "no weekly hours found")}${both}${r.site.quote ? `<br>*"${esc(r.site.quote).slice(0, 140)}"*` : ""}` : "—";
   return `| ${f.id} | ${esc(r.facts?.name)} ${osm(f.element, f.version)} by ${esc(f.mapper)}, ${f.edited_at.slice(0, 10)} | ${esc(w.old || r.facts?.old || "(none)")} | ${esc(w.new || r.facts?.new)} | ${site} | **${f.verdict}** ${f.code} | ${f.state}${Number(f.reward) ? `, ${gen(f.reward)}` : ""} |`;
 });
 const details = Object.values(fixes).map((f) => {

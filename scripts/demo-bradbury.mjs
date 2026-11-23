@@ -72,7 +72,7 @@ await reconcile("call open: 0.5 GEN pot, 0.5 GEN still credited to the sponsor")
 
 const cases = [
   ["node", "299523381", 26, "PizzaExpress, Baker Street: page text and schema.org state the same week"],
-  ["node", "11042163878", 6, "Gantry Climbing, Rotherhithe: hours and website added by the same edit"],
+  ["node", "11042163878", 6, "Gantry Climbing, Rotherhithe: a later edit that did not change the week"],
 ];
 const ids = {};
 for (const [kind, id, version, what] of cases) {

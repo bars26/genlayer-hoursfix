@@ -93,32 +93,31 @@ in [`docs/v1.1/`](docs/v1.1/REPRODUCTION.md); v1 ([`0xf3e1…284D`](https://expl
 
 ## Verified live, on real London edits
 
-`scripts/demo.mjs` ran HoursFix v1.1 on GenLayer Studio with a demo call (a test wallet, test GEN; not an offer to these
-mappers) over real OpenStreetMap edits made in Central and East London in November 2026. Every transaction, ruling,
-page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.md); the v1 run is in [`docs/v1/`](docs/v1/).
+`scripts/demo.mjs` ran HoursFix v2 on GenLayer Studio, and `scripts/demo-bradbury.mjs` on **Bradbury testnet**, with demo
+calls (test wallets, test GEN; not an offer to these mappers) over real OpenStreetMap edits made in Central and East
+London in November 2026. Every transaction, ruling, both page readings and every reconciliation is in
+[`docs/REPRODUCTION.md`](docs/REPRODUCTION.md); the v1.1 run is in [`docs/v1.1/`](docs/v1.1/REPRODUCTION.md).
 
-| Fix | Place (real OSM edit) | Page read (named before the window) | Ruling |
-|---|---|---|---|
-| `fix_0` | The Signal Box, Euston (node/6381240591 v10): none → `Mo-Sa 08:00-22:00; Su 09:00-21:00` | signalboxeuston.co.uk, named since July: the same week | **ELIGIBLE**; confirmed a day later after the element and the page were read again |
-| `fix_1` | PizzaExpress, Baker Street (node/299523381 v26): none → `Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00` | pizzaexpress.com/london-baker-street, named since August: the same week | **ELIGIBLE**; confirmed |
-| `fix_2` | Pitfield, Hoxton (node/4895959823 v11): none → `07:30-16:00`, **and the edit swapped the website** | friendsofourscafe.com (the earlier page), not the new pitfieldsocial.co.uk | UNCLEAR: the earlier page states no weekly hours. v1 paid this fix from the page the edit brought |
-| `fix_3` | Wavelengths Leisure Centre (way/1579773881 v2), created inside the window | none | INELIGIBLE: no page before the window (way located from its 30 unchanged nodes) |
-| `fix_4` | Superdrug, Cheapside (way/517030126 v6): hours **and website** added by the same edit | none | INELIGIBLE: no page before the window |
-| `fix_5` | Pizza Pilgrims, Victoria (node/5215406428 v11) | — | INELIGIBLE: the version did not change the week |
-| `fix_6` | Petit Pret, Marylebone (node/1251964294 v22) | — | INELIGIBLE: outside the call's box |
+| Fix | Place (real OSM edit) | Page text (model) | Page schema.org (code) | Ruling |
+|---|---|---|---|---|
+| `fix_0` | PizzaExpress, Baker Street (node/299523381 v26): none → `Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00` | the same week | the same week | **ELIGIBLE** on Studio and on Bradbury; disputed, **dismissed**, confirmed |
+| `fix_1` | The Signal Box, Euston (node/6381240591 v10): none → `Mo-Sa 08:00-22:00; Su 09:00-21:00` | `Mo-Sa 08:00-22:00; Su 09:00-21:00` | `Mo-Sa 08:00-21:00; Su 09:00-20:00` | **UNCLEAR `sources_disagree`**: the page contradicts itself, nothing reserved. v1.1 paid this fix from the text alone |
+| `fix_2` | Oma, Borough (node/12477919501 v4) | no weekly hours shown to validators | none | UNCLEAR `no_hours_on_site` |
+| `fix_3` | Waitrose, Canary Wharf (node/1708718478 v23): Friday fixed | the store page could not be read | — | UNCLEAR `site_unreadable` |
+| `fix_4` | Gantry Climbing, Rotherhithe (node/11042163878 v6) | — | — | INELIGIBLE `no_change` (on both networks): the hours were set by the version before |
 
-- **Confirmed** (`fix_0`, `fix_1`): a day after the edits, validators read each element and its page again; both
-  still showed the same week. Each paid 0.05 GEN to the scout; each mapper's 0.45 GEN is held until they publish a
-  GenLayer wallet on their OSM profile (a claim for The Signal Box's mapper was refused: *"CyrlNish's OpenStreetMap
-  profile does not publish one GenLayer wallet yet"*).
-- **Refused, taking nothing:** a call box larger than one degree, the same element submitted again, closing the call
-  before its last day, and a withdrawal with nothing credited.
-- `totals()` matched the contract's on-chain balance at **four points**, the last after the scout's withdrawal.
-- **A MetaMask test of v1.1 from the live app**, the same steps reviewers are given: the tester funded their own Central
-  London call, submitted The Signal Box's edit (`fix_7`, ELIGIBLE against the page named since July), confirmed it (the
-  page read again showed the same week) and withdrew the scout's 0.05 GEN. In `docs/ui-test.json` and REPRODUCTION.
-- The path where a fix is reverted after its call closed (the reward goes straight to the sponsor) is covered by
-  `test_a_reverted_fix_after_the_call_closed_returns_to_the_sponsor`; it needs a call to end, which a same-day live run cannot show.
+- **A dispute, dismissed** (on both networks): a keeper staked 10% of PizzaExpress's reward; validators read the element
+  and both page sources again at once (*"Monday 11:30 - 22:00 … Sunday 11:30 - 22:30"*, same week, same page). The
+  stake joined the mapper's reward: the mapper's held share is 0.5 GEN on Studio (0.45 + the 0.05 stake).
+- **Confirmed** a day after the edit: the scout's 10% credited and withdrawn on both networks; the mapper's share is held
+  until they publish a GenLayer wallet on their OSM profile (a claim was refused: *"JackGilmore's OpenStreetMap profile
+  does not publish one GenLayer wallet yet"*).
+- **Refused, taking nothing:** a call box larger than one degree, the same element again, a second dispute of the same
+  fix, a dispute after confirmation, confirming an UNCLEAR fix, closing the call before its last day.
+- `totals()` matched the contract's on-chain balance at **every** step on both networks (five points on each, the last after the withdrawals).
+- The upheld path (the hours or the page changed after submission: the disputer gets the stake back plus 10%, the rest
+  returns, to the sponsor if the call has closed) is covered by
+  `test_an_upheld_dispute_pays_the_disputer_and_returns_the_rest`.
 
 ## Who can do what (and the attacks this blocks)
 
@@ -132,6 +131,8 @@ page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.m
 | The new week must equal the page's, compared in code | The model reads the page; it never decides the outcome |
 | One eligible fix per element per call; a cap per mapper | No double payouts; no single mapper drains a call |
 | The reward is reserved, then paid only if, after the survival period, the element shows the same week, names the same page, and that page still states that week | Fixes reverted as wrong, vandalism, or a source that changed are not paid |
+| A page whose visible hours and schema.org hours differ decides nothing (`sources_disagree`) | Neither the model's reading nor stale markup alone can pay a fix |
+| A dispute stakes 10% of the reward, once per fix, before confirmation; a dismissed dispute's stake goes to the mapper | Anyone can stop a fix that no longer stands, and frivolous disputes cost the disputer |
 | A reward reverted after the call closed goes straight to the sponsor | A closed call never strands GEN |
 | The mapper is paid only at the wallet on their own OSM profile; two different addresses count as none | Nobody can redirect a mapper's reward |
 | Sites that cannot be read, or state no weekly hours, are `UNCLEAR`: nothing reserved, and the fix can be submitted again | An unreadable source never decides a payout |

@@ -1,0 +1,338 @@
+{
+  "network": "bradbury",
+  "version": "v2",
+  "contract": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17",
+  "accounts": {
+    "sponsor": "0x8A52cD7EE73EA27BFA45BD908607860a24E661F8",
+    "scout": "0x1cfF3f6F0E1aeA4665D1E133372171637e6f0Fc2",
+    "disputer": "0x463Dc91Ce7fFDDade35866d89E0a4EbA410f62d6"
+  },
+  "call": {
+    "box_json": "[51.47, -0.16, 51.54, 0.0]",
+    "ends": "2026-12-31",
+    "history_json": "[{\"at\": \"2026-11-23T12:12:17\", \"event\": \"opened\", \"pot\": \"500000000000000000\", \"reward\": \"250000000000000000\"}, {\"at\": \"2026-11-23T12:12:55\", \"code\": \"matches_site\", \"element\": \"node/299523381\", \"event\": \"submitted\", \"fix\": \"fix_0\", \"verdict\": \"ELIGIBLE\"}, {\"at\": \"2026-11-23T12:14:04\", \"code\": \"no_change\", \"element\": \"node/11042163878\", \"event\": \"submitted\", \"fix\": \"fix_1\", \"verdict\": \"INELIGIBLE\"}, {\"at\": \"2026-11-23T12:15:15\", \"event\": \"dispute_dismissed\", \"fix\": \"fix_0\"}, {\"at\": \"2026-11-23T12:16:20\", \"event\": \"confirmed\", \"fix\": \"fix_0\", \"state\": \"awaiting_wallet\"}]",
+    "id": "call_0",
+    "keys_json": "[\"shop\", \"amenity\", \"leisure\"]",
+    "n_eligible": 1,
+    "n_submitted": 2,
+    "paid_total": "25000000000000000",
+    "per_mapper": 1,
+    "pot": "250000000000000000",
+    "reserved": 0,
+    "returned_total": 0,
+    "reward": "250000000000000000",
+    "since": "2026-10-20",
+    "sponsor": "0x8a52cd7ee73ea27bfa45bd908607860a24e661f8",
+    "state": "open",
+    "survival_days": 1,
+    "title": "Central & East London opening hours (Bradbury)"
+  },
+  "fixes": {
+    "fix_0": {
+      "bonus": "25000000000000000",
+      "call_id": "call_0",
+      "code": "matches_site",
+      "confirm_json": "{\"authority\": \"https://www.pizzaexpress.com/london-baker-street\", \"authority_now\": \"https://www.pizzaexpress.com/london-baker-street\", \"authority_same\": true, \"current\": \"Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00\", \"hours_same\": true, \"mapper_name\": \"JackGilmore\", \"read_at\": \"2026-11-23T12:16:20\", \"same\": true, \"site_quote\": \"Monday 11:30 - 22:00 Tuesday 11:30 - 22:00 Wednesday 11:30 - 22:00 Thursday 11:30 - 22:30 Friday 11:30 - 23:00 Saturday 11:30 - 23:00 Sunday 11:30 - 22:30\", \"site_state\": \"ok\", \"site_week\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"state\": \"ok\", \"structured\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"version\": 26, \"visible\": true, \"wallet\": \"\"}",
+      "dispute_json": "{\"authority\": \"https://www.pizzaexpress.com/london-baker-street\", \"authority_now\": \"https://www.pizzaexpress.com/london-baker-street\", \"authority_same\": true, \"current\": \"Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00\", \"hours_same\": true, \"read_at\": \"2026-11-23T12:15:15\", \"same\": true, \"site_quote\": \"Opening hours Monday 11:30 - 22:00 Tuesday 11:30 - 22:00 Wednesday 11:30 - 22:00 Thursday 11:30 - 22:30 Friday 11:30 - 23:00 Saturday 11:30 - 23:00 Sunday 11:30 - 22:30\", \"site_state\": \"ok\", \"site_week\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"state\": \"ok\", \"structured\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"version\": 26, \"visible\": true}",
+      "disputed_by": "0x463dc91ce7ffddade35866d89e0a4eba410f62d6",
+      "edited_at": "2026-11-15T20:37:19",
+      "element": "node/299523381",
+      "held_until": "2026-11-16T20:37:19",
+      "id": "fix_0",
+      "mapper": "JackGilmore",
+      "mapper_share": "250000000000000000",
+      "mapper_uid": "11412261",
+      "mapper_wallet": "",
+      "reading_json": "{\"code\": \"matches_site\", \"facts\": {\"address\": \"131-133 Baker Street W1U 6SF London\", \"changeset\": \"192002193\", \"edit_website\": \"https://www.pizzaexpress.com/london-baker-street\", \"edited_at\": \"2026-11-15T20:37:19\", \"element\": \"node/299523381\", \"lat\": 51.521854, \"latest_version\": 26, \"lon\": -0.157589, \"mapper\": \"JackGilmore\", \"mapper_uid\": \"11412261\", \"name\": \"PizzaExpress\", \"new\": \"Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00\", \"old\": \"\", \"old_at\": \"2026-08-22T21:48:47\", \"previous\": \"\", \"version\": 26, \"website\": \"https://www.pizzaexpress.com/london-baker-street\"}, \"packet_sha256\": \"ed9856017474be0e97d94963d73696d55370364874aa4df25a9e5fd4f0856873\", \"read_at\": \"2026-11-23T12:12:55\", \"site\": {\"chars\": 2782, \"found\": true, \"opening_hours\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"quote\": \"Opening hours Monday 11:30 - 22:00 Tuesday 11:30 - 22:00 Wednesday 11:30 - 22:00 Thursday 11:30 - 22:30 Friday 11:30 - 23:00 Saturday 11:30 - 23:00 Sunday 11:30 - 22:30\", \"sources\": [\"visible\", \"structured\"], \"structured\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"text_sha256\": \"3530e0a37b34728e196ecf98dbac97a88a49f41b0e12e636136e32d6c9c6e584\", \"visible\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\"}, \"state\": \"ok\", \"verdict\": \"ELIGIBLE\", \"weeks\": {\"new\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"old\": \"\", \"site\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"structured\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\", \"visible\": \"Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30\"}}",
+      "reward": "250000000000000000",
+      "scout": "0x1cff3f6f0e1aea4665d1e133372171637e6f0fc2",
+      "scout_share": "25000000000000000",
+      "state": "awaiting_wallet",
+      "submitted_at": "2026-11-23T12:12:55",
+      "verdict": "ELIGIBLE",
+      "version": 26,
+      "why": "ELIGIBLE: The new hours match the hours on the business's own page, and the hours they replaced did not. node/299523381 v26 (PizzaExpress) by JackGilmore on 2026-11-15: '(none)' -> 'Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00'. The page says Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30."
+    },
+    "fix_1": {
+      "bonus": 0,
+      "call_id": "call_0",
+      "code": "no_change",
+      "confirm_json": "",
+      "dispute_json": "",
+      "disputed_by": "",
+      "edited_at": "2026-11-20T19:42:57",
+      "element": "node/11042163878",
+      "held_until": "",
+      "id": "fix_1",
+      "mapper": "GeorgeHoneywood",
+      "mapper_share": 0,
+      "mapper_uid": "10031443",
+      "mapper_wallet": "",
+      "reading_json": "{\"code\": \"no_change\", \"facts\": {\"address\": \"SE16 7LL London\", \"changeset\": \"192242397\", \"edit_website\": \"https://gantryclimbing.com/\", \"edited_at\": \"2026-11-20T19:42:57\", \"element\": \"node/11042163878\", \"lat\": 51.495507, \"latest_version\": 6, \"lon\": -0.047281, \"mapper\": \"GeorgeHoneywood\", \"mapper_uid\": \"10031443\", \"name\": \"Gantry Climbing\", \"new\": \"Mo-Fr 10:00-22:00; Sa-Su 09:00-19:00\", \"old\": \"\", \"old_at\": \"2026-08-28T14:40:52\", \"previous\": \"Mo-Fr 10:00-22:00; Sa-Su 09:00-19:00\", \"version\": 6, \"website\": \"\"}, \"packet_sha256\": \"b8d4bac4e4c163178cfb3a434a676f545ed734f7710e048d0f2d7fffeff225a4\", \"read_at\": \"2026-11-23T12:14:04\", \"state\": \"ok\", \"verdict\": \"INELIGIBLE\"}",
+      "reward": 0,
+      "scout": "0x1cff3f6f0e1aea4665d1e133372171637e6f0fc2",
+      "scout_share": 0,
+      "state": "refused",
+      "submitted_at": "2026-11-23T12:14:04",
+      "verdict": "INELIGIBLE",
+      "version": 6,
+      "why": "INELIGIBLE: This version did not change the week the version before it described. node/11042163878 v6 (Gantry Climbing) by GeorgeHoneywood on 2026-11-20: '(none)' -> 'Mo-Fr 10:00-22:00; Sa-Su 09:00-19:00'."
+    }
+  },
+  "labels": {
+    "fix_0": "PizzaExpress, Baker Street: page text and schema.org state the same week",
+    "fix_1": "Gantry Climbing, Rotherhithe: a later edit that did not change the week"
+  },
+  "reconciliations": [
+    {
+      "label": "call open: 0.5 GEN pot, 0.5 GEN still credited to the sponsor",
+      "pots": "500000000000000000",
+      "reserved": "0",
+      "held": "0",
+      "owed": "500000000000000000",
+      "expected": "1000000000000000000",
+      "balance": "1000000000000000000",
+      "ok": true
+    },
+    {
+      "label": "an eligible fix reserved from the pot",
+      "pots": "250000000000000000",
+      "reserved": "250000000000000000",
+      "held": "0",
+      "owed": "500000000000000000",
+      "expected": "1000000000000000000",
+      "balance": "1000000000000000000",
+      "ok": true
+    },
+    {
+      "label": "after the dispute",
+      "pots": "250000000000000000",
+      "reserved": "275000000000000000",
+      "held": "0",
+      "owed": "525000000000000000",
+      "expected": "1050000000000000000",
+      "balance": "1050000000000000000",
+      "ok": true
+    },
+    {
+      "label": "confirmed: the scout credited, the mapper's share held",
+      "pots": "250000000000000000",
+      "reserved": "0",
+      "held": "250000000000000000",
+      "owed": "550000000000000000",
+      "expected": "1050000000000000000",
+      "balance": "1050000000000000000",
+      "ok": true
+    },
+    {
+      "label": "end of run, after the withdrawals",
+      "pots": "250000000000000000",
+      "reserved": "0",
+      "held": "250000000000000000",
+      "owed": "25000000000000000",
+      "expected": "525000000000000000",
+      "balance": "525000000000000000",
+      "ok": true
+    }
+  ],
+  "log": [
+    {
+      "who": "sponsor",
+      "call": "deposit()",
+      "value": "1.0000",
+      "ok": true,
+      "hash": "0xeaeab22aad09ae89caaf952aadb6939db6c14a18a30203f1aa3dff4e8859f30c",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "RETURN"
+      ],
+      "seconds": 38,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "sponsor",
+      "call": "open_call(\"Too big\", \"51.0\", \"-1.0\", \"52.5\", \"0.5\", \"shop\", \"2026-10-20\", \"2026-12-31\", \"250000000000000000\", 1, 1, \"500000000000000000\")",
+      "value": "0.0000",
+      "ok": false,
+      "hash": "0x9bb6c31e93f7d3e10ed9c096c9eba3a357bbde678c70481f1f6f68fa9b741ff1",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_ERROR",
+      "votes": [
+        "ERROR",
+        "ERROR",
+        "TIMEOUT",
+        "ERROR",
+        "ERROR"
+      ],
+      "seconds": 42,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "sponsor",
+      "call": "open_call(\"Central & East London opening hours (Bradbury)\", \"51.47\", \"-0.16\", \"51.54\", \"0.0\", \"shop,amenity,leisure\", \"2026-10-20\", \"2026-12-31\", \"250000000000000000\", 1, 1, \"500000000000000000\")",
+      "value": "0.0000",
+      "ok": true,
+      "hash": "0xe67b6eff840ae06fe494710f0c589b6047e14751b40230cb1ff5508d8e48bebc",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "TIMEOUT"
+      ],
+      "seconds": 33,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "scout",
+      "call": "submit(\"call_0\", \"node\", \"299523381\", 26)",
+      "value": "0.0000",
+      "ok": true,
+      "hash": "0x8e2cdc77e060e18485a0f086147e1c41f63e902f94099c4625749d3b6d29e093",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "RETURN"
+      ],
+      "seconds": 65,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "scout",
+      "call": "submit(\"call_0\", \"node\", \"11042163878\", 6)",
+      "value": "0.0000",
+      "ok": true,
+      "hash": "0x685a3662dd8e8efda789d8d9227e72dd3c879a33390bb528c80abd5020283c1b",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "TIMEOUT"
+      ],
+      "seconds": 31,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "disputer",
+      "call": "deposit()",
+      "value": "0.0500",
+      "ok": true,
+      "hash": "0x5963103689cbfb65356502d0dfd9a696cf18227f3f26e6694e5767d93d4d61d0",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "RETURN",
+        "RETURN",
+        "TIMEOUT",
+        "RETURN",
+        "RETURN"
+      ],
+      "seconds": 30,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "disputer",
+      "call": "dispute(\"fix_0\")",
+      "value": "0.0000",
+      "ok": true,
+      "hash": "0x2b672d0d60edc63cf5dce580e98e5fd682bb2362aafd9425b749c7f88a9397f8",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "NONDET_DISAGREE",
+        "TIMEOUT",
+        "RETURN",
+        "RETURN",
+        "RETURN"
+      ],
+      "seconds": 56,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "scout",
+      "call": "confirm(\"fix_0\")",
+      "value": "0.0000",
+      "ok": true,
+      "hash": "0x796ba7d3619cad1504f9580ae0ac733916db9106998ba2c0d192ffe5a3c51e82",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "RETURN",
+        "RETURN",
+        "TIMEOUT",
+        "RETURN",
+        "TIMEOUT"
+      ],
+      "seconds": 39,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "scout",
+      "call": "claim(\"fix_0\")",
+      "value": "0.0000",
+      "ok": false,
+      "hash": "0xef82f1ec850b76c597ac42f970c2026129ed013544c4fc7e8856b16476b444de",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_ERROR",
+      "votes": [
+        "ERROR",
+        "ERROR",
+        "TIMEOUT",
+        "ERROR",
+        "ERROR"
+      ],
+      "seconds": 31,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "scout",
+      "call": "withdraw()",
+      "value": "0.0000",
+      "ok": true,
+      "hash": "0xb79c6293bb5ac175a767c9e2dec2c82f48623817831e9c06e25a94cba1b85e8e",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "RETURN"
+      ],
+      "seconds": 33,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    },
+    {
+      "who": "sponsor",
+      "call": "withdraw()",
+      "value": "0.0000",
+      "ok": true,
+      "hash": "0x66507d2bd05f0f4ac4857da7a802b6efa9b19e7132ef05e3ccea5279f9f8a301",
+      "status": "ACCEPTED",
+      "execution": "FINISHED_WITH_RETURN",
+      "votes": [
+        "RETURN",
+        "RETURN",
+        "RETURN",
+        "TIMEOUT",
+        "RETURN"
+      ],
+      "seconds": 29,
+      "recipient": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17"
+    }
+  ]
+}

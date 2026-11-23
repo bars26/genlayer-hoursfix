@@ -52,9 +52,9 @@ await reconcile(C.sponsor, "the 4 GEN pot taken from the deposit");
 // Both present and the same week: eligible. Both present and different: sources_disagree, nothing reserved.
 const pizza = await submit("PizzaExpress, Baker Street: page text and schema.org state the same week", "node", "299523381", 26);
 await submit("The Signal Box, Euston: page text and schema.org state different weeks", "node", "6381240591", 10);
-const oma = await submit("Oma, Borough: hours added 14 Nov; page with visible hours only", "node", "12477919501", 4);
+const oma = await submit("Oma, Borough: hours added 14 Nov; the page shows no weekly hours to validators", "node", "12477919501", 4);
 await submit("Waitrose, Canary Wharf: Friday fixed 6 Nov; store page", "node", "1708718478", 23);
-await submit("Gantry Climbing, Rotherhithe: hours and website added by the same edit", "node", "11042163878", 6);
+await submit("Gantry Climbing, Rotherhithe: a later edit that did not change the week", "node", "11042163878", 6);
 await submit("PizzaExpress again", "node", "299523381", 26, { expectError: true });
 await reconcile(C.sponsor, "eligible fixes reserved from the pot");
 
@@ -66,7 +66,8 @@ await write(C.keeper, "keeper", "dispute", [pizza]);
 await write(C.keeper, "keeper", "dispute", [pizza], 0n, { expectError: true });
 await reconcile(C.sponsor, "a dismissed dispute: the stake reserved for the mapper");
 
-for (const fixId of [pizza, oma]) await write(C.keeper, "keeper", "confirm", [fixId]);
+await write(C.keeper, "keeper", "confirm", [pizza]);
+await write(C.keeper, "keeper", "confirm", [oma], 0n, { expectError: true }); // UNCLEAR: nothing was reserved, nothing to confirm
 await write(C.keeper, "keeper", "dispute", [pizza], 0n, { expectError: true }); // confirmed: no longer disputable
 await write(C.keeper, "keeper", "claim", [pizza], 0n, { expectError: true }); // no wallet on the mapper's profile
 await write(C.keeper, "keeper", "close_call", [callId], 0n, { expectError: true });
