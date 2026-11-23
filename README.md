@@ -115,6 +115,10 @@ London in November 2026. Every transaction, ruling, both page readings and every
 - **Refused, taking nothing:** a call box larger than one degree, the same element again, a second dispute of the same
   fix, a dispute after confirmation, confirming an UNCLEAR fix, closing the call before its last day.
 - `totals()` matched the contract's on-chain balance at **every** step on both networks (five points on each, the last after the withdrawals).
+- **A MetaMask test of v2 on Bradbury from the live app**, the steps reviewers are given: the tester funded their own
+  Central London call (`call_1`), submitted PizzaExpress (`fix_2`, ELIGIBLE: page text and schema.org agree), disputed
+  it (dismissed; the stake joined the mapper's reward), confirmed it and withdrew the scout's 0.01 GEN; seven
+  transactions, each accepted by a majority of five validators. In `docs/ui-test.json` and REPRODUCTION.
 - The upheld path (the hours or the page changed after submission: the disputer gets the stake back plus 10%, the rest
   returns, to the sponsor if the call has closed) is covered by
   `test_an_upheld_dispute_pays_the_disputer_and_returns_the_rest`.

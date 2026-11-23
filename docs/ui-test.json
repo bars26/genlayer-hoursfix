@@ -1,0 +1,50 @@
+{
+  "network": "bradbury",
+  "contract": "0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17",
+  "wallet": "0x4F80B5c475fcEd34fc9A07FfCcF39E1Adc1406bf",
+  "note": "MetaMask test of HoursFix v2 from the production app (hoursfix-bars26.vercel.app/?network=bradbury) on Bradbury testnet, contract 0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17, five validators per transaction, 2026-11-23 12:28-12:36 UTC. The tester funded their own Central London call, submitted a real edit, disputed it with a stake, confirmed it and withdrew the scout's share. Every transaction was accepted by a majority; a validator that ran out of time or disagreed is shown.",
+  "steps": [
+    [
+      "Deposit 0.3 GEN (sent by the app before opening the call)",
+      "0.3 GEN",
+      "credited to the tester; 4/5 returned (timeout)",
+      "0x6113db4bf52811b45a79c0e76f85d2cc2c5f775b9555ea288aa25fd66ee309c9"
+    ],
+    [
+      "Open a call: Central London, shops/amenities/leisure, fixes since 2026-10-20, 0.1 GEN per fix, pot 0.3 GEN from the deposit, survival 1 day",
+      "",
+      "call_1 open; 4/5 returned (timeout)",
+      "0x9a7904fd7c9ab42c855c30cb6879c7ea2820dc3e5dee37d10c9a70964d372fbd"
+    ],
+    [
+      "Submit PizzaExpress, Baker Street (node/299523381 v26) to call_1",
+      "",
+      "fix_2 ELIGIBLE matches_site: page text and schema.org both Mo-We 11:30-22:00; Th 11:30-22:30; Fr-Sa 11:30-23:00; Su 11:30-22:30; 0.1 GEN reserved; 4/5 returned (disagree)",
+      "0xa2c0b4329eff3715b0ae39a51b5abb0f5036caa08d57610d110de8ef855b8f6a"
+    ],
+    [
+      "Deposit the 0.01 GEN dispute stake (sent by the app before the dispute)",
+      "0.01 GEN",
+      "credited; 5/5 returned",
+      "0x6a6351346c5a893b60b149cd8521e80c00c927e35204ab205965ca43b173e391"
+    ],
+    [
+      "Dispute fix_2 (stake 10% of the reward)",
+      "",
+      "DISMISSED: element, page and both page readings unchanged; the 0.01 GEN stake joined the mapper's reward; 3/5 returned (timeout, disagree)",
+      "0x03944f0e4c8d06292e31581159ab9dc17a0715972f69b3b05db6ee1155faf094"
+    ],
+    [
+      "Confirm fix_2",
+      "",
+      "awaiting_wallet: 0.01 GEN credited to the tester as scout, the mapper's 0.09 + 0.01 GEN held for a wallet on JackGilmore's OSM profile; 3/5 returned (disagree, timeout)",
+      "0x6cd7ba2c9f2678b7448f90953f4e45129ba134cefb1a8efc9aef6cd429b98d46"
+    ],
+    [
+      "Withdraw",
+      "",
+      "0.01 GEN sent to the tester; 4/5 returned (timeout)",
+      "0xc084241e10cfb0dd18793a69972b9b84cae931254a463039fe1d73bb7c5a39b5"
+    ]
+  ]
+}
