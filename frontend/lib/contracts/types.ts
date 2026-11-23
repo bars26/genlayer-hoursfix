@@ -2,7 +2,7 @@
 
 type Num = string | number | bigint;
 
-export type FixState = "held" | "paid" | "awaiting_wallet" | "reverted" | "returned" | "refused";
+export type FixState = "held" | "paid" | "awaiting_wallet" | "reverted" | "disputed" | "returned" | "refused";
 export type Verdict = "ELIGIBLE" | "INELIGIBLE" | "UNCLEAR";
 
 export interface Call {
@@ -47,6 +47,10 @@ export interface Fix {
   reading_json: string;
   confirm_json: string;
   submitted_at: string;
+  /** v2: who disputed the fix (once per fix), the re-reading, and a dismissed dispute's stake added to the reward. */
+  disputed_by?: string;
+  dispute_json?: string;
+  bonus?: Num;
 }
 
 export interface Reading {
@@ -68,8 +72,9 @@ export interface Reading {
     lat?: number;
     lon?: number;
   };
-  site?: { found: boolean; opening_hours: string; quote: string; text_sha256: string; chars: number };
-  weeks?: { new: string; old: string; site: string };
+  site?: { found: boolean; opening_hours: string; quote: string; text_sha256: string; chars: number; structured?: string; visible?: string; sources?: string[] };
+  /** v2: `visible` is the model's reading of the page text, `structured` the page's schema.org hours parsed in code. */
+  weeks?: { new: string; old: string; site: string; visible?: string; structured?: string };
   read_at?: string;
   packet_sha256?: string;
 }
@@ -87,6 +92,20 @@ export interface ElementPreview {
 
 export const MIN_REWARD_WEI = 10n ** 16n;
 export const SCOUT_PERCENT = 10;
+/** A dispute stakes a tenth of the fix's reward from the disputer's credit. */
+export const STAKE_DIVISOR = 10n;
+
+export interface DisputeReading {
+  same: boolean;
+  hours_same: boolean;
+  authority_same: boolean;
+  current: string;
+  authority_now: string;
+  site_state: string;
+  site_week: string;
+  structured?: string;
+  read_at?: string;
+}
 
 export function wei(v: Num | undefined): bigint {
   try {
@@ -144,6 +163,7 @@ export const STATE_TEXT: Record<FixState, string> = {
   paid: "Paid: 90% to the mapper's wallet, 10% to whoever submitted it",
   awaiting_wallet: "Confirmed: the scout's 10% is paid, the mapper's 90% waits for a GenLayer wallet on their OSM profile",
   reverted: "The hours changed again before confirmation: the reward went back to the call",
+  disputed: "Disputed and upheld: the disputer got their stake back plus 10%, the rest went back to the call",
   returned: "Never claimed: the mapper's share went back to the sponsor",
   refused: "Nothing reserved",
 };
@@ -163,6 +183,7 @@ export const CODE_LABEL: Record<string, string> = {
   site_unreadable: "business page could not be read",
   no_hours_on_site: "page states no weekly hours",
   does_not_match_site: "new hours differ from the page",
+  sources_disagree: "the page's visible hours and its schema.org hours differ",
   already_correct: "hours already matched the page before the call",
   mapper_cap: "mapper reached the call's limit",
 };

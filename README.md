@@ -23,11 +23,16 @@ HoursFix makes the check and the payment a contract:
    in the window and inside the box, carries one of the call's keys, and actually changed the week the version before
    it described (for a way, its location is where its nodes were at the edit). Then it reads the **business's own
    page**: the `opening_hours:url` or `website` the place named **before the call's window opened**, so an edit that adds
-   or swaps the page cannot bring its own source (rendered in a browser if a plain fetch is refused). The model writes
-   that page's regular weekly hours in `opening_hours` syntax. All values become weeks of time ranges, compared in code: the new week must **equal the page's**, and the
+   or swaps the page cannot bring its own source (rendered in a browser if a plain fetch is refused). The page is read
+   **twice**: the model writes its visible regular weekly hours in `opening_hours` syntax, and code parses the page's
+   **schema.org** opening hours; when both exist they must agree, or the page contradicts itself and nothing is decided.
+   All values become weeks of time ranges, compared in code: the new week must **equal the page's**, and the
    week the place had **when the call's window opened** must not (otherwise there was nothing to fix, and breaking
    hours after a call opens to "fix" them earns nothing).
-4. An eligible fix **reserves** the reward. After the survival period anyone **confirms** it: validators read the
+4. An eligible fix **reserves** the reward. Until it is confirmed, anyone who thinks it no longer stands may
+   **dispute** it, staking a tenth of the reward: validators read the element and the page again at once. Upheld: the
+   disputer gets the stake back plus the scout's 10%, the rest returns. Dismissed: the stake joins the mapper's reward.
+   After the survival period anyone **confirms** it: validators read the
    element again, check that it still names the same page, and **read that page again**. Same week on both: **90% to
    the mapper, 10% to whoever submitted it**. Hours changed, page changed, the page now states another week, or the
    element deleted: the reward goes back to the pot, or straight to the sponsor if the call has closed.
@@ -38,11 +43,32 @@ HoursFix makes the check and the payment a contract:
 
 **Live app:** [hoursfix-bars26.vercel.app](https://hoursfix-bars26.vercel.app). Paste any OSM node or way (or pick an
 example) to see, without a wallet, every edit that changed its opening hours, the week HoursFix reads from each, and
-the business page validators would check. Funding a call or submitting a fix needs MetaMask on GenLayer Studio (chain
-61999) and **Test GEN** from the header.
+the business page validators would check. Funding a call, submitting or disputing a fix needs MetaMask on **Bradbury
+testnet** (chain 4221, GEN from the [faucet](https://testnet-faucet.genlayer.foundation)) or GenLayer Studio (chain 61999,
+**Test GEN** from the header); switch networks in the header.
 
-**Contract (GenLayer Studio, v1.1):** [`0xc2B033fC1d4Ee51D9D85b3F80ece3aA534F2D885`](https://explorer-studio.genlayer.com/address/0xc2B033fC1d4Ee51D9D85b3F80ece3aA534F2D885).
-v1 ([`0xf3e1…284D`](https://explorer-studio.genlayer.com/address/0xf3e17409dae4e00f94162eF8a2C8C449ba33284D)) and its run are in [`docs/v1/`](docs/v1/).
+**Contracts (v2):**
+
+| Network | Address | Source |
+|---|---|---|
+| Bradbury testnet | [`0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17`](https://explorer-bradbury.genlayer.com/address/0x17BC5f1522b6286c1AA336Ff022EEAf10FafEc17) | `contracts/hours_fix.bradbury.py`, generated from the Studio source by `scripts/bradbury_source.py` (CI checks it is up to date) |
+| GenLayer Studio | [`0x9DF30BE0de55b619abb5f3A210bAB09BA931cb96`](https://explorer-studio.genlayer.com/address/0x9DF30BE0de55b619abb5f3A210bAB09BA931cb96) | `contracts/hours_fix.py` |
+
+Both deployments are checked byte-identical to the repository (`scripts/verify-code.mjs`, `scripts/verify-code-bradbury.mjs`).
+v1.1 ([`0xc2B0…D885`](https://explorer-studio.genlayer.com/address/0xc2B033fC1d4Ee51D9D85b3F80ece3aA534F2D885)) and its run are
+in [`docs/v1.1/`](docs/v1.1/REPRODUCTION.md); v1 ([`0xf3e1…284D`](https://explorer-studio.genlayer.com/address/0xf3e17409dae4e00f94162eF8a2C8C449ba33284D)) in [`docs/v1/`](docs/v1/).
+
+### What v2 adds
+
+| | v1.1 | v2 |
+|---|---|---|
+| **Second source** | one reading of the page: the model writes the week from its visible text | the page's **schema.org** `openingHoursSpecification` / `openingHours` is parsed **in code** as well; both present and different is `sources_disagree` (UNCLEAR, nothing reserved), so neither the model nor stale markup alone decides a payout |
+| **Disputes** | a wrong fix could only be caught at confirmation | anyone disputes a held fix with a **stake** (10% of the reward), once per fix; validators re-read the element and both page sources at once. Upheld: stake back plus 10% of the reward, the rest returns to the pot or the sponsor. Dismissed: the stake joins the mapper's reward, so frivolous disputes pay the mapper |
+| **One recheck** | confirmation had its own reading | `recheck()` is shared by `confirm` and `dispute`: same hours, same page, page readable, both sources agree, same week |
+| **Networks** | GenLayer Studio | **Bradbury testnet** as well (five independent validators), with tests run on both GenVM runners in CI |
+| **Tests** | 77 | 89, on the Studio and the Bradbury runner |
+
+### What v1.1 changed (after review)
 
 ### What v1.1 changes (after review)
 
@@ -67,32 +93,31 @@ v1 ([`0xf3e1…284D`](https://explorer-studio.genlayer.com/address/0xf3e17409dae
 
 ## Verified live, on real London edits
 
-`scripts/demo.mjs` ran HoursFix v1.1 on GenLayer Studio with a demo call (a test wallet, test GEN; not an offer to these
-mappers) over real OpenStreetMap edits made in Central and East London in November 2026. Every transaction, ruling,
-page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.md); the v1 run is in [`docs/v1/`](docs/v1/).
+`scripts/demo.mjs` ran HoursFix v2 on GenLayer Studio, and `scripts/demo-bradbury.mjs` on **Bradbury testnet**, with demo
+calls (test wallets, test GEN; not an offer to these mappers) over real OpenStreetMap edits made in Central and East
+London in November 2026. Every transaction, ruling, both page readings and every reconciliation is in
+[`docs/REPRODUCTION.md`](docs/REPRODUCTION.md); the v1.1 run is in [`docs/v1.1/`](docs/v1.1/REPRODUCTION.md).
 
-| Fix | Place (real OSM edit) | Page read (named before the window) | Ruling |
-|---|---|---|---|
-| `fix_0` | The Signal Box, Euston (node/6381240591 v10): none → `Mo-Sa 08:00-22:00; Su 09:00-21:00` | signalboxeuston.co.uk, named since July: the same week | **ELIGIBLE**; confirmed a day later after the element and the page were read again |
-| `fix_1` | PizzaExpress, Baker Street (node/299523381 v26): none → `Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00` | pizzaexpress.com/london-baker-street, named since August: the same week | **ELIGIBLE**; confirmed |
-| `fix_2` | Pitfield, Hoxton (node/4895959823 v11): none → `07:30-16:00`, **and the edit swapped the website** | friendsofourscafe.com (the earlier page), not the new pitfieldsocial.co.uk | UNCLEAR: the earlier page states no weekly hours. v1 paid this fix from the page the edit brought |
-| `fix_3` | Wavelengths Leisure Centre (way/1579773881 v2), created inside the window | none | INELIGIBLE: no page before the window (way located from its 30 unchanged nodes) |
-| `fix_4` | Superdrug, Cheapside (way/517030126 v6): hours **and website** added by the same edit | none | INELIGIBLE: no page before the window |
-| `fix_5` | Pizza Pilgrims, Victoria (node/5215406428 v11) | — | INELIGIBLE: the version did not change the week |
-| `fix_6` | Petit Pret, Marylebone (node/1251964294 v22) | — | INELIGIBLE: outside the call's box |
+| Fix | Place (real OSM edit) | Page text (model) | Page schema.org (code) | Ruling |
+|---|---|---|---|---|
+| `fix_0` | PizzaExpress, Baker Street (node/299523381 v26): none → `Mo-We 11:30-22:00; Th,Su 11:30-22:30; Fr-Sa 11:30-23:00` | the same week | the same week | **ELIGIBLE** on Studio and on Bradbury; disputed, **dismissed**, confirmed |
+| `fix_1` | The Signal Box, Euston (node/6381240591 v10): none → `Mo-Sa 08:00-22:00; Su 09:00-21:00` | `Mo-Sa 08:00-22:00; Su 09:00-21:00` | `Mo-Sa 08:00-21:00; Su 09:00-20:00` | **UNCLEAR `sources_disagree`**: the page contradicts itself, nothing reserved. v1.1 paid this fix from the text alone |
+| `fix_2` | Oma, Borough (node/12477919501 v4) | no weekly hours shown to validators | none | UNCLEAR `no_hours_on_site` |
+| `fix_3` | Waitrose, Canary Wharf (node/1708718478 v23): Friday fixed | the store page could not be read | — | UNCLEAR `site_unreadable` |
+| `fix_4` | Gantry Climbing, Rotherhithe (node/11042163878 v6) | — | — | INELIGIBLE `no_change` (on both networks): the hours were set by the version before |
 
-- **Confirmed** (`fix_0`, `fix_1`): a day after the edits, validators read each element and its page again; both
-  still showed the same week. Each paid 0.05 GEN to the scout; each mapper's 0.45 GEN is held until they publish a
-  GenLayer wallet on their OSM profile (a claim for The Signal Box's mapper was refused: *"CyrlNish's OpenStreetMap
-  profile does not publish one GenLayer wallet yet"*).
-- **Refused, taking nothing:** a call box larger than one degree, the same element submitted again, closing the call
-  before its last day, and a withdrawal with nothing credited.
-- `totals()` matched the contract's on-chain balance at **four points**, the last after the scout's withdrawal.
-- **A MetaMask test of v1.1 from the live app**, the same steps reviewers are given: the tester funded their own Central
-  London call, submitted The Signal Box's edit (`fix_7`, ELIGIBLE against the page named since July), confirmed it (the
-  page read again showed the same week) and withdrew the scout's 0.05 GEN. In `docs/ui-test.json` and REPRODUCTION.
-- The path where a fix is reverted after its call closed (the reward goes straight to the sponsor) is covered by
-  `test_a_reverted_fix_after_the_call_closed_returns_to_the_sponsor`; it needs a call to end, which a same-day live run cannot show.
+- **A dispute, dismissed** (on both networks): a keeper staked 10% of PizzaExpress's reward; validators read the element
+  and both page sources again at once (*"Monday 11:30 - 22:00 … Sunday 11:30 - 22:30"*, same week, same page). The
+  stake joined the mapper's reward: the mapper's held share is 0.5 GEN on Studio (0.45 + the 0.05 stake).
+- **Confirmed** a day after the edit: the scout's 10% credited and withdrawn on both networks; the mapper's share is held
+  until they publish a GenLayer wallet on their OSM profile (a claim was refused: *"JackGilmore's OpenStreetMap profile
+  does not publish one GenLayer wallet yet"*).
+- **Refused, taking nothing:** a call box larger than one degree, the same element again, a second dispute of the same
+  fix, a dispute after confirmation, confirming an UNCLEAR fix, closing the call before its last day.
+- `totals()` matched the contract's on-chain balance at **every** step on both networks (five points on each, the last after the withdrawals).
+- The upheld path (the hours or the page changed after submission: the disputer gets the stake back plus 10%, the rest
+  returns, to the sponsor if the call has closed) is covered by
+  `test_an_upheld_dispute_pays_the_disputer_and_returns_the_rest`.
 
 ## Who can do what (and the attacks this blocks)
 
@@ -106,6 +131,8 @@ page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.m
 | The new week must equal the page's, compared in code | The model reads the page; it never decides the outcome |
 | One eligible fix per element per call; a cap per mapper | No double payouts; no single mapper drains a call |
 | The reward is reserved, then paid only if, after the survival period, the element shows the same week, names the same page, and that page still states that week | Fixes reverted as wrong, vandalism, or a source that changed are not paid |
+| A page whose visible hours and schema.org hours differ decides nothing (`sources_disagree`) | Neither the model's reading nor stale markup alone can pay a fix |
+| A dispute stakes 10% of the reward, once per fix, before confirmation; a dismissed dispute's stake goes to the mapper | Anyone can stop a fix that no longer stands, and frivolous disputes cost the disputer |
 | A reward reverted after the call closed goes straight to the sponsor | A closed call never strands GEN |
 | The mapper is paid only at the wallet on their own OSM profile; two different addresses count as none | Nobody can redirect a mapper's reward |
 | Sites that cannot be read, or state no weekly hours, are `UNCLEAR`: nothing reserved, and the fix can be submitted again | An unreadable source never decides a payout |
@@ -117,12 +144,17 @@ page quote and reconciliation is in [`docs/REPRODUCTION.md`](docs/REPRODUCTION.m
 ```bash
 python -m venv .venv && source .venv/bin/activate && pip install -r requirements.txt
 genvm-lint check contracts/hours_fix.py
-python -m pytest tests/direct -q                         # 77 direct-mode tests
+python -m pytest tests/direct -q                         # 89 direct-mode tests (Studio runner)
+pip install "genlayer-test==0.30.0rc2" && HOURSFIX_NETWORK=bradbury python -m pytest tests/direct -q   # Bradbury runner
 npm install
 node scripts/deploy.mjs                                  # deploys to GenLayer Studio, prints the address
 node scripts/demo.mjs <address>                          # the live demo; writes docs/demo-run.json
+python scripts/bradbury_source.py                        # writes contracts/hours_fix.bradbury.py
+node scripts/deploy-bradbury.mjs                         # deploys to Bradbury testnet
+node scripts/demo-bradbury.mjs <address>                 # writes docs/bradbury/demo-run.json
 node scripts/reproduction.mjs                            # renders docs/REPRODUCTION.md
 node scripts/verify-code.mjs <address>                   # checks the deployed code is byte-identical
+node scripts/verify-code-bradbury.mjs <address>
 cd frontend && npm run dev                               # the app on localhost:3000
 ```
 
@@ -138,6 +170,11 @@ cd frontend && npm run dev                               # the app on localhost:
 - The page is the business's own claim; if it is out of date, a fix that matches it is still paid.
 - Mappers do not publish GenLayer wallets on their OSM profiles yet, so mapper shares are held; the demo shows the held
   state, and the claim path is covered by the tests.
-- GenLayer Studio only. The source carries the Bradbury testnet header switch used by our other projects.
+- schema.org data is parsed only when it states one regular week (`openingHoursSpecification` without `validFrom`, or
+  `openingHours` strings); pages with several weeks (seasonal tables) or other markup count as visible text only.
+- A live run cannot show an upheld dispute without a fix that changes after it is submitted; that path is covered by
+  `test_an_upheld_dispute_pays_the_disputer_and_returns_the_rest` (open and closed call).
+- On Bradbury, transactions report the decision and execution, not return values; the app and the demo read every
+  result back from the contract.
 
 OpenStreetMap data © OpenStreetMap contributors, available under the Open Database License.

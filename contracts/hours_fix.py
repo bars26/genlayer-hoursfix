@@ -60,6 +60,7 @@ HELD = "held"  # eligible; the reward is reserved until the edit has survived `s
 PAID = "paid"  # confirmed; the mapper's share is credited to the mapper's wallet, the scout's to the scout
 AWAITING_WALLET = "awaiting_wallet"  # confirmed; the mapper's share waits for a GenLayer wallet on the mapper's OSM profile
 REVERTED = "reverted"  # the hours were changed again before confirmation: the reward went back to the pot
+DISPUTED = "disputed"  # a dispute showed the fix no longer stands: the disputer got 10%, the rest went back
 RETURNED = "returned"  # never claimed: the mapper's share went back to the sponsor
 REFUSED = "refused"  # ruled ineligible or unclear: nothing reserved
 
@@ -67,6 +68,7 @@ DAYS = ("Mo", "Tu", "We", "Th", "Fr", "Sa", "Su")
 _GEN = 10**18
 _MIN_REWARD = 10**16  # 0.01 GEN
 _SCOUT_PERCENT = 10  # whoever submits an eligible fix receives 10% of its reward; the mapper 90%
+_STAKE_DIVISOR = 10  # a dispute stakes 10% of the fix's reward
 _DAY = 86400
 _MAX_LOOKBACK_DAYS = 90  # a call may reward fixes made up to 90 days before it opened
 _MAX_CALL_DAYS = 180
@@ -294,14 +296,71 @@ def _mapper(uid: str) -> tuple:
                   "created": str(u.get("account_created") or "")[:10]}
 
 
-def _page_text(url: str) -> str:
-    """The readable text of a business's page near where it talks about hours ("" if it cannot be read). A plain fetch
-    first; if the site refuses it or builds its hours with scripts, the page rendered in a browser."""
-    text = ""
+_LD_RE = re.compile(r"(?is)<script[^>]+application/ld\+json[^>]*>(.*?)</script>")
+_SCHEMA_DAYS = {"monday": "Mo", "tuesday": "Tu", "wednesday": "We", "thursday": "Th", "friday": "Fr", "saturday": "Sa", "sunday": "Su"}
+
+
+def _ld_nodes(obj):
+    if isinstance(obj, list):
+        for x in obj:
+            yield from _ld_nodes(x)
+    elif isinstance(obj, dict):
+        yield obj
+        for v in obj.values():
+            if isinstance(v, (list, dict)):
+                yield from _ld_nodes(v)
+
+
+def _hhmm(t) -> str:
+    m = re.match(r"^(\d{1,2}):(\d{2})", str(t or "").strip())
+    return f"{int(m.group(1)):02d}:{m.group(2)}" if m else ""
+
+
+def structured_hours(raw: str) -> str:
+    """The week a page states in its schema.org data (JSON-LD openingHoursSpecification or openingHours), the machine-
+    readable copy of its hours that search engines read, as canonical opening_hours text; "" if there is none, or if the
+    page describes several different weeks (a chain's page listing several branches)."""
+    weeks = set()
+    for block in _LD_RE.findall(raw or "")[:12]:
+        try:
+            data = json.loads(html.unescape(block.strip()))
+        except ValueError:
+            continue
+        for node in _ld_nodes(data):
+            rules = []
+            spec = node.get("openingHoursSpecification")
+            for item in spec if isinstance(spec, list) else [spec] if isinstance(spec, dict) else []:
+                if not isinstance(item, dict) or item.get("validFrom") or item.get("validThrough"):
+                    continue  # dated exceptions are not the regular week
+                days = item.get("dayOfWeek")
+                days = days if isinstance(days, list) else [days]
+                names = [_SCHEMA_DAYS.get(str(d or "").rstrip("/").split("/")[-1].lower(), "") for d in days]
+                a, b = _hhmm(item.get("opens")), _hhmm(item.get("closes"))
+                if not names or "" in names or not a or not b:
+                    rules = None
+                    break
+                if a != b:  # opens == closes means closed that day
+                    rules.append(f"{','.join(names)} {a}-{b}")
+            hours = node.get("openingHours")
+            if rules is not None and isinstance(hours, (str, list)) and not spec:
+                for h in hours if isinstance(hours, list) else [hours]:
+                    rules.append(str(h).strip())
+            if rules:
+                week = parse_hours(", ".join(rules))  # schema.org entries add up, like OSM's ", " rules
+                weeks.add(hours_text(week) if week is not None else "unparsed")
+    weeks.discard("unparsed")
+    return weeks.pop() if len(weeks) == 1 else ""
+
+
+def _page(url: str) -> tuple:
+    """(readable text near where the page talks about hours, the week in its schema.org data). A plain fetch first; if
+    the site refuses it or builds its hours with scripts, the page rendered in a browser."""
+    text, structured = "", ""
     try:
         response = gl.nondet.web.get(url, headers=_PAGE_HEADERS)
         if response.status == 200:
             raw = (response.body or b"").decode("utf-8", errors="replace")
+            structured = structured_hours(raw)
             raw = re.sub(r"(?is)<(script|style|noscript|svg)[^>]*>.*?</\1>", " ", raw)
             text = html.unescape(re.sub(r"\s+", " ", re.sub(r"<[^>]+>", " ", raw))).strip()
     except Exception:
@@ -316,7 +375,30 @@ def _page_text(url: str) -> str:
             pass
     m = _HOURS_SPAN.search(text) or _HOURS_WORDS.search(text)
     start = max(0, m.start() - 1500) if m else 0
-    return text[start:start + _MAX_PAGE_CHARS]
+    return text[start:start + _MAX_PAGE_CHARS], structured
+
+
+def page_week(name: str, address: str, url: str) -> dict:
+    """What a business's page says its regular week is, from two readings of it: the model reads the visible text, and
+    code parses the page's schema.org data. If both exist they must agree, or the page contradicts itself and nothing
+    is decided ("disagree"). "unreadable" / "no_hours" / "ok" with the week."""
+    text, structured = _page(url)
+    if len(text) < 60 and not structured:
+        return {"state": "unreadable"}
+    out = {"structured": structured, "text_sha256": _sha256(text), "chars": len(text), "visible": "", "quote": "",
+           "found": False}
+    if len(text) >= 60:
+        site = _site_hours(name, address, url, text)
+        visible = parse_hours(site["opening_hours"]) if site["found"] else None
+        out.update(found=site["found"], opening_hours=site["opening_hours"], quote=site["quote"], visible=hours_text(visible))
+    if out["visible"] and structured and out["visible"] != structured:
+        out["state"] = "disagree"
+        return out
+    week = out["visible"] or structured
+    out["state"] = "ok" if week else "no_hours"
+    out["week"] = week
+    out["sources"] = [k for k in ("visible", "structured") if out[k]]
+    return out
 
 
 def _site_hours(name: str, address: str, url: str, text: str) -> dict:
@@ -419,22 +501,52 @@ def read_fix(kind: str, eid: str, version: int, since: str, now: str, box: list,
         return rule(INELIGIBLE, "no_change")
     if not re.match(r"^https?://\S+$", facts["website"]):
         return rule(INELIGIBLE, "no_prior_website")
-    text = _page_text(facts["website"])
-    if len(text) < 60:
+    page = page_week(facts["name"], facts["address"], facts["website"])
+    if page["state"] == "unreadable":
         return rule(UNCLEAR, "site_unreadable")
-    site = _site_hours(facts["name"], facts["address"], facts["website"], text)
-    site_week = parse_hours(site["opening_hours"]) if site["found"] else None
     old_week = parse_hours(facts["old"])
-    out["site"] = {"found": site["found"], "opening_hours": site["opening_hours"], "quote": site["quote"],
-                   "text_sha256": _sha256(text), "chars": len(text)}
-    out["weeks"] = {"new": hours_text(new_week), "old": hours_text(old_week), "site": hours_text(site_week)}
-    if site_week is None:
+    out["site"] = {k: page.get(k) for k in ("found", "opening_hours", "quote", "text_sha256", "chars", "structured", "visible", "sources")}
+    out["weeks"] = {"new": hours_text(new_week), "old": hours_text(old_week), "site": page.get("week", ""),
+                    "visible": page["visible"], "structured": page["structured"]}
+    if page["state"] == "disagree":
+        return rule(UNCLEAR, "sources_disagree")
+    if page["state"] != "ok":
         return rule(UNCLEAR, "no_hours_on_site")
-    if new_week != site_week:
+    if hours_text(new_week) != page["week"]:
         return rule(INELIGIBLE, "does_not_match_site")
-    if old_week is not None and old_week == site_week:
+    if old_week is not None and hours_text(old_week) == page["week"]:
         return rule(INELIGIBLE, "already_correct")
     return rule(ELIGIBLE, "matches_site")
+
+
+def recheck(kind: str, eid: str, accepted: str, authority: str, name: str, address: str) -> dict:
+    """Does an accepted fix still stand? The element's latest version must show the same week and still name the same
+    page, and that page, read again from both sources, must still state that week. A page that cannot be read now, or
+    shows no hours, decides nothing ("error")."""
+    state, versions = _history(kind, eid)
+    if state == "error":
+        return {"state": "error", "what": "osm"}
+    latest = max(versions, key=lambda v: int(v.get("version") or 0)) if versions else {}
+    visible = bool(latest) and latest.get("visible", True) is not False
+    now_hours = str((latest.get("tags") or {}).get("opening_hours") or "")
+    out = {"state": "ok", "version": int(latest.get("version") or 0), "visible": visible, "current": now_hours[:255],
+           "authority": authority, "authority_now": _authority(latest.get("tags") or {}) if visible else "",
+           "hours_same": visible and hours_text(parse_hours(now_hours)) == accepted, "site_week": "", "site_state": ""}
+    out["authority_same"] = out["authority_now"] == authority
+    if out["hours_same"] and out["authority_same"]:
+        page = page_week(name, address, authority)
+        if page["state"] in ("unreadable", "no_hours"):
+            return {"state": "error", "what": "page" if page["state"] == "unreadable" else "page_hours"}
+        out["site_state"] = page["state"]
+        out["site_week"] = page.get("week", "")
+        out["structured"] = page.get("structured", "")
+        out["site_quote"] = page.get("quote", "")
+    out["same"] = out["hours_same"] and out["authority_same"] and out["site_state"] == "ok" and out["site_week"] == accepted
+    return out
+
+
+_RECHECK_ERRORS = {"page": "The business's page could not be read right now",
+                   "page_hours": "The business's page did not show its weekly hours to the validators"}
 
 
 def _validator(read):
@@ -457,7 +569,8 @@ def same_reading(a: dict, b: dict) -> bool:
     if "facts" not in a and "facts" not in b:  # a confirmation or a wallet reading: every field but the quote must agree
         return {k: v for k, v in a.items() if k != "site_quote"} == {k: v for k, v in b.items() if k != "site_quote"}
     keys = ("state", "what", "verdict", "code", "facts", "weeks")
-    return all(a.get(k) == b.get(k) for k in keys) and (a.get("site") or {}).get("found") == (b.get("site") or {}).get("found")
+    sa, sb = a.get("site") or {}, b.get("site") or {}
+    return all(a.get(k) == b.get(k) for k in keys) and sa.get("found") == sb.get("found") and sa.get("structured") == sb.get("structured")
 
 
 CODE_TEXT = {
@@ -475,6 +588,7 @@ CODE_TEXT = {
     "site_unreadable": "The business's page could not be read",
     "no_hours_on_site": "The business's page does not state regular weekly hours",
     "does_not_match_site": "The new hours do not match the hours on the business's own page",
+    "sources_disagree": "The business's page contradicts itself: its visible hours and its schema.org hours differ",
     "already_correct": "When the call's window opened, the hours already matched the business's page",
     "mapper_cap": "This mapper has reached the call's limit of paid fixes",
 }
@@ -527,9 +641,12 @@ class Fix:
     reward: u256
     mapper_share: u256
     scout_share: u256
-    reading_json: str  # facts, the page reading and the three weeks, with hashes
+    reading_json: str  # facts, the page reading (both sources) and the weeks, with hashes
     confirm_json: str
     submitted_at: str
+    disputed_by: str  # "" or the address that staked a dispute on the fix
+    dispute_json: str
+    bonus: u256  # a failed dispute's stake: paid to the mapper with the reward
 
 
 class HoursFix(_Contract):
@@ -590,13 +707,30 @@ class HoursFix(_Contract):
             self.owed[key] = _plus(self.owed.get(key, u256(0)), amount)
             self.owed_total = _plus(self.owed_total, amount)
 
-    def _take(self, who: Address, amount: int) -> None:
+    def _take(self, who: Address, amount: int, check: bool = False) -> None:
+        """Take GEN credited to `who` (see `deposit`). `check` only checks: a call that needs the validators to agree
+        checks before the reading and takes after it, so a reading that fails consensus moves nothing."""
         key = who.as_hex.lower()
         have = int(self.owed.get(key, u256(0)))
         if have < amount:
             raise _Err(f"deposit first: {_gen(amount)} needed, {_gen(have)} credited")
-        self.owed[key] = u256(have - amount)
-        self.owed_total = _plus(self.owed_total, -amount)
+        if not check:
+            self.owed[key] = u256(have - amount)
+            self.owed_total = _plus(self.owed_total, -amount)
+
+    def _release(self, c: Call, amount: int) -> None:
+        c.reserved = _plus(c.reserved, -amount)
+        self.reserved_total = _plus(self.reserved_total, -amount)
+
+    def _return(self, c: Call, amount: int) -> None:
+        """GEN a fix no longer earns goes back to its call's pot, or to the sponsor if the call has closed (a closed call
+        has returned its pot already)."""
+        if c.state == "open":
+            c.pot = _plus(c.pot, amount)
+            self.pots_total = _plus(self.pots_total, amount)
+        else:
+            self._credit(c.sponsor, amount)
+            c.returned_total = _plus(c.returned_total, amount)
 
     def _num(self, name: str, raw, low: float, high: float) -> float:
         txt = self._text(raw)
@@ -736,6 +870,7 @@ class HoursFix(_Contract):
             code=code, why=self._why(verdict, code, r), state=HELD if verdict == ELIGIBLE else REFUSED,
             held_until=held_until if verdict == ELIGIBLE else "", reward=u256(0), mapper_share=u256(0),
             scout_share=u256(0), reading_json=json.dumps(packet, sort_keys=True), confirm_json="", submitted_at=now[:19],
+            disputed_by="", dispute_json="", bonus=u256(0),
         )
         if verdict == ELIGIBLE:
             reward = int(c.reward)
@@ -774,57 +909,29 @@ class HoursFix(_Contract):
         uid = fix.mapper_uid
 
         def current() -> str:
-            state, versions = _history(kind, eid)
-            if state == "error":
-                return json.dumps({"state": "error", "what": "osm"})
-            latest = max(versions, key=lambda v: int(v.get("version") or 0)) if versions else {}
-            visible = bool(latest) and latest.get("visible", True) is not False
-            now_hours = str((latest.get("tags") or {}).get("opening_hours") or "")
-            out = {"state": "ok", "version": int(latest.get("version") or 0), "visible": visible, "current": now_hours[:255],
-                   "authority": authority, "authority_now": _authority(latest.get("tags") or {}) if visible else "",
-                   "hours_same": visible and hours_text(parse_hours(now_hours)) == accepted}
-            out["authority_same"] = out["authority_now"] == authority
-            out["site_week"] = ""
-            if out["hours_same"] and out["authority_same"]:
-                # the source is read again: the page the fix was checked against must still state the same week
-                text = _page_text(authority)
-                if len(text) < 60:
-                    return json.dumps({"state": "error", "what": "page"})
-                site = _site_hours(name, address, authority, text)
-                week = parse_hours(site["opening_hours"]) if site["found"] else None
-                if week is None:
-                    return json.dumps({"state": "error", "what": "page_hours"})
-                out["site_week"] = hours_text(week)
-                out["site_quote"] = site["quote"]
-            out["same"] = out["hours_same"] and out["authority_same"] and out["site_week"] == accepted
-            mstate, m = _mapper(uid)
-            if mstate == "error":
-                return json.dumps({"state": "error", "what": "osm"})
-            out["wallet"] = (m or {}).get("wallet", "")
-            out["mapper_name"] = (m or {}).get("name", "")
+            out = recheck(kind, eid, accepted, authority, name, address)
+            if out["state"] == "ok":
+                mstate, m = _mapper(uid)
+                if mstate == "error":
+                    return json.dumps({"state": "error", "what": "osm"})
+                out["wallet"] = (m or {}).get("wallet", "")
+                out["mapper_name"] = (m or {}).get("name", "")
             return json.dumps(out, sort_keys=True)
 
         r = json.loads(gl.vm.run_nondet(current, _validator(current)))
         if r["state"] != "ok":
-            what = {"page": "The business's page could not be read right now", "page_hours": "The business's page did not show its weekly hours to the validators"}
-            raise _Err(f"{what.get(r.get('what'), 'OpenStreetMap could not be read right now')}; try again")
+            raise _Err(f"{_RECHECK_ERRORS.get(r.get('what'), 'OpenStreetMap could not be read right now')}; try again")
         r["read_at"] = self._now()[:19]
         fix.confirm_json = json.dumps(r, sort_keys=True)
-        reward = int(fix.reward)
-        c.reserved = _plus(c.reserved, -reward)
-        self.reserved_total = _plus(self.reserved_total, -reward)
+        reward, bonus = int(fix.reward), int(fix.bonus)
+        self._release(c, reward + bonus)
         if not r["same"]:
-            if c.state == "open":
-                c.pot = _plus(c.pot, reward)
-                self.pots_total = _plus(self.pots_total, reward)
-            else:  # a closed call has returned its pot already: the reward goes straight back to the sponsor
-                self._credit(c.sponsor, reward)
-                c.returned_total = _plus(c.returned_total, reward)
+            self._return(c, reward + bonus)
             fix.state = REVERTED
             self._log(c, "reverted", fix=fix.id, to="pot" if c.state == "open" else "sponsor")
             return REVERTED
         scout_share = reward * _SCOUT_PERCENT // 100
-        mapper_share = reward - scout_share
+        mapper_share = reward - scout_share + bonus
         fix.scout_share, fix.mapper_share = u256(scout_share), u256(mapper_share)
         self._credit(fix.scout, scout_share)
         c.paid_total = _plus(c.paid_total, scout_share)
@@ -838,6 +945,52 @@ class HoursFix(_Contract):
             fix.state = AWAITING_WALLET
         self._log(c, "confirmed", fix=fix.id, state=fix.state)
         return fix.state
+
+    @gl.public.write
+    def dispute(self, fix_id: str) -> str:
+        """Anyone who thinks a held fix no longer stands (the hours or the page changed, or the page now contradicts
+        itself) disputes it before confirmation, staking 10% of its reward from their deposit; once per fix. Validators
+        read the element and the page again at once. Upheld: the disputer gets the stake back plus the scout's 10%, and
+        the other 90% of the reward returns to the pot (or the sponsor). Dismissed: the stake joins the reward and goes to
+        the mapper at confirmation. Returns "UPHELD" or "DISMISSED"."""
+        fix = self._fix(fix_id)
+        if fix.state != HELD:
+            raise _Err("Only a fix waiting for confirmation can be disputed")
+        if fix.disputed_by:
+            raise _Err("This fix has been disputed already")
+        c = self.calls[fix.call_id]
+        stake = int(fix.reward) // _STAKE_DIVISOR
+        sender = gl.message.sender_address
+        self._take(sender, stake, check=True)
+        kind, eid = fix.element.split("/")
+        reading = json.loads(fix.reading_json)
+        accepted, authority = reading["weeks"]["new"], reading["facts"]["website"]
+        name, address = reading["facts"].get("name", ""), reading["facts"].get("address", "")
+
+        def again() -> str:
+            return json.dumps(recheck(kind, eid, accepted, authority, name, address), sort_keys=True)
+
+        r = json.loads(gl.vm.run_nondet(again, _validator(again)))
+        if r["state"] != "ok":
+            raise _Err(f"{_RECHECK_ERRORS.get(r.get('what'), 'OpenStreetMap could not be read right now')}; try again")
+        self._take(sender, stake)
+        r["read_at"] = self._now()[:19]
+        fix.disputed_by = sender.as_hex.lower()
+        fix.dispute_json = json.dumps(r, sort_keys=True)
+        if r["same"]:
+            fix.bonus = _plus(fix.bonus, stake)
+            c.reserved = _plus(c.reserved, stake)
+            self.reserved_total = _plus(self.reserved_total, stake)
+            self._log(c, "dispute_dismissed", fix=fix.id)
+            return "DISMISSED"
+        reward = int(fix.reward)
+        bounty = reward * _SCOUT_PERCENT // 100
+        self._release(c, reward)
+        self._credit(sender, stake + bounty)
+        self._return(c, reward - bounty)
+        fix.state = DISPUTED
+        self._log(c, "dispute_upheld", fix=fix.id)
+        return "UPHELD"
 
     @gl.public.write
     def claim(self, fix_id: str) -> str:
