@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 
 import pytest
 
-from tests.direct.conftest import CONTRACT_PATH, llm_json, to_hex
+from tests.direct.conftest import BRADBURY, CONTRACT_PATH, llm_json, to_hex
 
 GEN = 10**18
 OSM = "https://api.openstreetmap.org/api/0.6"
@@ -191,7 +191,7 @@ def test_an_eligible_fix_reserves_the_reward(direct_vm, direct_deploy, direct_al
         "ELIGIBLE", "matches_site", "held", "node/1001", 2, "mapper_a", str(MAPPER_UID))
     assert int(f.reward) == REWARD and to_hex(f.scout) == to_hex(direct_bob)
     r = json.loads(f.reading_json)
-    assert r["weeks"] == {"new": SITE_HOURS, "old": "", "site": SITE_HOURS}
+    assert r["weeks"] == {"new": SITE_HOURS, "old": "", "site": SITE_HOURS, "visible": SITE_HOURS, "structured": ""}
     assert r["site"]["found"] and r["facts"]["website"] == SITE and len(r["packet_sha256"]) == 64
     assert "match the hours on the business's own page" in f.why and "'(none)' -> '" in f.why
     c = contract.get_call(call_id)
@@ -306,6 +306,8 @@ def test_a_fix_that_corrects_wrong_hours_is_eligible(direct_vm, direct_deploy, d
     (dict(llm_raw="not json at all"), "not usable"),
 ])
 def test_failed_readings_change_nothing(direct_vm, direct_deploy, direct_alice, direct_bob, setup, reason):
+    if BRADBURY and reason == "not usable":
+        reason = "invalid"  # the Bradbury runner rejects a non-JSON answer before the contract sees it
     contract, call_id = _open(direct_vm, direct_deploy, direct_alice)
     _submit(direct_vm, contract, call_id, direct_bob, expect=reason, **setup)
     assert int(contract.fix_count) == 0 and int(contract.get_call(call_id).pot) == POT
@@ -541,3 +543,119 @@ def test_lists(direct_vm, direct_deploy, direct_alice, direct_bob):
     assert [f.id for f in contract.get_fixes(0, 200)] == [fix_id]
     with direct_vm.expect_revert("No fix with id fix_7"):
         contract.get_fix("fix_7")
+
+
+# --- v2: the page's schema.org hours as a second source -----------------------------------------------------------------
+
+
+def _ld(obj):
+    return f'<script type="application/ld+json">{json.dumps(obj)}</script>'
+
+
+SPEC = {"@context": "https://schema.org", "@type": "Store", "name": "Superdrug", "openingHoursSpecification": [
+    {"@type": "OpeningHoursSpecification", "dayOfWeek": ["https://schema.org/Monday", "https://schema.org/Tuesday",
+     "https://schema.org/Wednesday", "https://schema.org/Thursday", "https://schema.org/Friday"], "opens": "07:30:00", "closes": "20:00:00"},
+    {"@type": "OpeningHoursSpecification", "dayOfWeek": "Saturday", "opens": "09:00", "closes": "18:00"},
+    {"@type": "OpeningHoursSpecification", "dayOfWeek": "https://schema.org/Sunday", "opens": "12:00", "closes": "18:00"},
+    {"@type": "OpeningHoursSpecification", "dayOfWeek": "Sunday", "opens": "00:00", "closes": "00:00",
+     "validFrom": "2026-12-25", "validThrough": "2026-12-25"}]}
+
+
+@pytest.mark.parametrize("ld, found, verdict, code, structured", [
+    (SPEC, True, "ELIGIBLE", "matches_site", SITE_HOURS),  # both sources, same week
+    ({"@type": "Cafe", "openingHours": ["Mo-Fr 07:30-20:00", "Sa 09:00-18:00", "Su 12:00-18:00"]}, True, "ELIGIBLE", "matches_site", SITE_HOURS),
+    ({"@type": "Cafe", "openingHours": "Mo-Su 08:00-21:00"}, True, "UNCLEAR", "sources_disagree", "Mo-Su 08:00-21:00"),
+    (SPEC, False, "ELIGIBLE", "matches_site", SITE_HOURS),  # the visible text unread: the structured week alone
+    ({"@graph": [{"@type": "Store", "openingHours": "Mo-Su 08:00-21:00"}, {"@type": "Store", "openingHours": "Mo-Fr 09:00-17:00"}]},
+     True, "ELIGIBLE", "matches_site", ""),  # a chain's page with two different weeks: no structured source
+    ({"@type": "Cafe", "openingHours": "Mon - Fri 06:30 - 22:00"}, True, "ELIGIBLE", "matches_site", ""),  # not schema syntax
+])
+def test_the_schema_org_week_is_a_second_source(direct_vm, direct_deploy, direct_alice, direct_bob, ld, found, verdict, code, structured):
+    contract, call_id = _open(direct_vm, direct_deploy, direct_alice)
+    fix_id = _submit(direct_vm, contract, call_id, direct_bob, page=PAGE.replace("</body>", _ld(ld) + "</body>"), found=found,
+                     oh=SITE_HOURS if found else "")
+    f = contract.get_fix(fix_id)
+    r = json.loads(f.reading_json)
+    assert (f.verdict, f.code, r["weeks"]["structured"]) == (verdict, code, structured)
+    if verdict == "ELIGIBLE":
+        assert r["weeks"]["site"] == SITE_HOURS
+        assert r["site"]["sources"] == [k for k in ("visible", "structured") if (found and k == "visible") or (k == "structured" and structured)]
+
+
+def test_a_page_that_contradicts_itself_at_confirmation_reverts(direct_vm, direct_deploy, direct_alice, direct_bob):
+    contract, call_id, fix_id = _eligible(direct_vm, direct_deploy, direct_alice, direct_bob)
+    _ripen(contract, fix_id)
+    _setup(direct_vm, page=PAGE.replace("</body>", _ld({"@type": "Store", "openingHours": "Mo-Su 10:00-16:00"}) + "</body>"))
+    assert contract.confirm(fix_id) == "reverted"
+    assert json.loads(contract.get_fix(fix_id).confirm_json)["site_state"] == "disagree"
+
+
+# --- v2: staked disputes ---------------------------------------------------------------------------------------------------
+
+
+def test_a_dismissed_dispute_pays_its_stake_to_the_mapper(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
+    contract, call_id, fix_id = _eligible(direct_vm, direct_deploy, direct_alice, direct_bob)
+    stake = REWARD // 10
+    direct_vm.sender = direct_charlie
+    with direct_vm.expect_revert("deposit first"):
+        contract.dispute(fix_id)
+    _deposit(direct_vm, contract, direct_charlie, stake)
+    _setup(direct_vm)
+    direct_vm.sender = direct_charlie
+    assert contract.dispute(fix_id) == "DISMISSED"
+    f = contract.get_fix(fix_id)
+    assert (int(f.bonus), f.disputed_by, _owed(contract, direct_charlie)) == (stake, to_hex(direct_charlie).lower(), 0)
+    assert int(contract.get_call(call_id).reserved) == REWARD + stake
+    with direct_vm.expect_revert("disputed already"):
+        contract.dispute(fix_id)
+    _ripen(contract, fix_id)
+    _setup(direct_vm, description=f"GenLayer wallet: {to_hex(direct_charlie)}")
+    assert contract.confirm(fix_id) == "paid"
+    assert int(contract.get_fix(fix_id).mapper_share) == REWARD - REWARD // 10 + stake
+    t = _balance(contract)
+    assert int(t["reserved"]) == 0
+
+
+@pytest.mark.parametrize("setup, closed", [
+    (dict(versions=DEFAULT + [_version(3, _ts(-1), oh="Mo-Su 10:00-16:00")]), False),  # the hours were changed again
+    (dict(oh="Mo-Fr 09:00-17:00"), False),  # the page now states another week
+    (dict(oh="Mo-Fr 09:00-17:00"), True),  # ... after the call closed: the rest goes to the sponsor
+])
+def test_an_upheld_dispute_pays_the_disputer_and_returns_the_rest(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie, setup, closed):
+    contract, call_id, fix_id = _eligible(direct_vm, direct_deploy, direct_alice, direct_bob)
+    if closed:
+        contract.calls[call_id].ends = _day(-1)
+        contract.close_call(call_id)
+    stake = REWARD // 10
+    _deposit(direct_vm, contract, direct_charlie, stake)
+    _setup(direct_vm, **setup)
+    direct_vm.sender = direct_charlie
+    assert contract.dispute(fix_id) == "UPHELD"
+    f = contract.get_fix(fix_id)
+    c = contract.get_call(call_id)
+    assert f.state == "disputed" and _owed(contract, direct_charlie) == stake + REWARD // 10
+    rest = REWARD - REWARD // 10
+    if closed:
+        assert (int(c.pot), _owed(contract, direct_alice)) == (0, POT - REWARD + rest)
+    else:
+        assert int(c.pot) == POT - REWARD + rest
+    assert int(c.reserved) == 0 and _owed(contract, direct_bob) == 0
+    _balance(contract)
+    with direct_vm.expect_revert("not waiting for confirmation"):
+        contract.confirm(fix_id)
+
+
+def test_disputes_need_a_held_fix_and_a_readable_page(direct_vm, direct_deploy, direct_alice, direct_bob, direct_charlie):
+    contract, call_id, fix_id = _eligible(direct_vm, direct_deploy, direct_alice, direct_bob)
+    _deposit(direct_vm, contract, direct_charlie, REWARD // 10)
+    _setup(direct_vm, page="", page_status=503)
+    direct_vm.sender = direct_charlie
+    with direct_vm.expect_revert("could not be read right now"):
+        contract.dispute(fix_id)
+    assert _owed(contract, direct_charlie) == REWARD // 10 and contract.get_fix(fix_id).disputed_by == ""
+    _setup(direct_vm, oh="Mo-Fr 09:00-17:00")
+    _history(direct_vm, [dict(v, id=2002) for v in DEFAULT], eid=2002)
+    direct_vm.sender = direct_bob
+    refused = contract.submit(call_id, "node", "2002", 2)  # does_not_match_site
+    with direct_vm.expect_revert("Only a fix waiting for confirmation"):
+        contract.dispute(refused)
