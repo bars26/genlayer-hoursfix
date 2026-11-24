@@ -231,7 +231,7 @@ export function useHoursWrite() {
             const owed = await contract.owedTo(address);
             if (owed === 0n) refuse("Nothing is credited to this wallet.");
             result = await contract.withdraw(onProgress);
-            note = `${formatGen(owed, 4)} GEN sent to your wallet.`;
+            note = `${formatGen(owed, 4)} GEN sent to your wallet (it arrives a few minutes after the transaction finalizes).`;
             break;
           }
         }
